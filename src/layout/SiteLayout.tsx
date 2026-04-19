@@ -1,9 +1,8 @@
-import { useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import AuthModal from '../components/AuthModal'
-import type { AuthMode } from '../components/AuthModal'
 import SuccessModal from '../components/SuccessModal'
 import { getDashboardPath, humanizeRole, useAuth } from '../context/AuthContext'
+import { useUiStore } from '../store/uiStore'
 
 const navItems = [
   { label: 'Home', to: '/' },
@@ -15,10 +14,14 @@ const navItems = [
 
 function SiteLayout() {
   const { user, logout } = useAuth()
-
-  const [authMode, setAuthMode] = useState<AuthMode | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const authModalMode = useUiStore((state) => state.authModalMode)
+  const successMessage = useUiStore((state) => state.successMessage)
+  const isProfileMenuOpen = useUiStore((state) => state.isProfileMenuOpen)
+  const openAuthModal = useUiStore((state) => state.openAuthModal)
+  const closeAuthModal = useUiStore((state) => state.closeAuthModal)
+  const setSuccessMessage = useUiStore((state) => state.setSuccessMessage)
+  const toggleProfileMenuOpen = useUiStore((state) => state.toggleProfileMenuOpen)
+  const setProfileMenuOpen = useUiStore((state) => state.setProfileMenuOpen)
 
   return (
     <div className="min-h-screen">
@@ -47,7 +50,7 @@ function SiteLayout() {
             <div className="relative">
               <button
                 className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2"
-                onClick={() => setIsMenuOpen((state) => !state)}
+                onClick={toggleProfileMenuOpen}
                 type="button"
               >
                 <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/10 font-semibold text-primary">
@@ -59,18 +62,18 @@ function SiteLayout() {
                 </div>
               </button>
 
-              {isMenuOpen ? (
+              {isProfileMenuOpen ? (
                 <div className="absolute right-0 z-40 mt-3 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                   <Link
                     className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => setIsMenuOpen(false)}
+                    onClick={() => setProfileMenuOpen(false)}
                     to={getDashboardPath(user.role)}
                   >
                     Dashboard
                   </Link>
                   <Link
                     className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => setIsMenuOpen(false)}
+                    onClick={() => setProfileMenuOpen(false)}
                     to="/profile"
                   >
                     Profile
@@ -79,7 +82,7 @@ function SiteLayout() {
                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
                     onClick={() => {
                       logout()
-                      setIsMenuOpen(false)
+                      setProfileMenuOpen(false)
                     }}
                     type="button"
                   >
@@ -91,7 +94,7 @@ function SiteLayout() {
           ) : (
             <button
               className="rounded-lg bg-primary px-8 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-300/70 transition hover:bg-blue-700"
-              onClick={() => setAuthMode('login')}
+              onClick={() => openAuthModal('login')}
               type="button"
             >
               Login
@@ -129,7 +132,7 @@ function SiteLayout() {
                 <p className="text-2xl font-medium text-slate-900">Become hotel Owner</p>
                 <button
                   className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white shadow-lg shadow-blue-300/70 transition hover:bg-blue-700"
-                  onClick={() => setAuthMode('register')}
+                  onClick={() => openAuthModal('register')}
                   type="button"
                 >
                   Register Now
@@ -140,12 +143,12 @@ function SiteLayout() {
         </div>
       </footer>
 
-      {authMode ? (
+      {authModalMode ? (
         <AuthModal
-          mode={authMode}
-          onClose={() => setAuthMode(null)}
+          mode={authModalMode}
+          onClose={closeAuthModal}
           onSuccess={setSuccessMessage}
-          onSwitchMode={setAuthMode}
+          onSwitchMode={openAuthModal}
         />
       ) : null}
 

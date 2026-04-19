@@ -1,17 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useUiStore } from '../../store/uiStore'
+import type { AdminDashboardTab } from '../../store/uiStore'
 
-type AdminTab =
-  | 'dashboard'
-  | 'users'
-  | 'owners'
-  | 'bookings'
-  | 'refunds'
-  | 'messages'
-  | 'help'
-  | 'settings'
-
-const tabItems: Array<{ id: AdminTab; label: string }> = [
+const tabItems: Array<{ id: AdminDashboardTab; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'users', label: 'Users' },
   { id: 'owners', label: 'Hotel Owners' },
@@ -37,8 +29,10 @@ const owners = [
 
 function AdminDashboardPage() {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
-  const [search, setSearch] = useState('')
+  const activeTab = useUiStore((state) => state.adminDashboardTab)
+  const setActiveTab = useUiStore((state) => state.setAdminDashboardTab)
+  const search = useUiStore((state) => state.adminSearch)
+  const setSearch = useUiStore((state) => state.setAdminSearch)
 
   const filteredUsers = useMemo(
     () => users.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())),

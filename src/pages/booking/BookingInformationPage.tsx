@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import BookingHeader from '../../components/BookingHeader'
 import { useBooking } from '../../context/BookingContext'
@@ -17,36 +17,25 @@ const diffDays = (checkIn: string, checkOut: string) => {
   return Math.max(diff, 1)
 }
 
-function BookingInformationPage() {
-  const { slug } = useParams<{ slug: string }>()
+type BookingInformationContentProps = {
+  hotel: (typeof hotels)[number]
+}
+
+function BookingInformationContent({ hotel }: BookingInformationContentProps) {
   const navigate = useNavigate()
   const { draft, startDraft, updateDraft } = useBooking()
-
-  const hotel = hotels.find((item) => item.slug === slug)
-  if (!hotel) {
-    return <Navigate replace to="/hotels" />
-  }
 
   const todayPlusOne = new Date()
   todayPlusOne.setDate(todayPlusOne.getDate() + 1)
   const defaultCheckIn = todayPlusOne.toISOString().split('T')[0]
 
-  const [checkIn, setCheckIn] = useState(defaultCheckIn)
-  const [days, setDays] = useState(2)
-  const [guests, setGuests] = useState(2)
+  const initialCheckIn = draft?.hotelSlug === hotel.slug ? draft.checkIn : defaultCheckIn
+  const initialDays = draft?.hotelSlug === hotel.slug ? diffDays(draft.checkIn, draft.checkOut) : 2
+  const initialGuests = draft?.hotelSlug === hotel.slug ? draft.guests : 2
 
-  useEffect(() => {
-    if (draft?.hotelSlug === hotel.slug) {
-      setCheckIn(draft.checkIn)
-      setDays(diffDays(draft.checkIn, draft.checkOut))
-      setGuests(draft.guests)
-      return
-    }
-
-    setCheckIn(defaultCheckIn)
-    setDays(2)
-    setGuests(2)
-  }, [hotel.slug, draft?.hotelSlug, draft?.checkIn, draft?.checkOut, draft?.guests, defaultCheckIn])
+  const [checkIn, setCheckIn] = useState(initialCheckIn)
+  const [days, setDays] = useState(initialDays)
+  const [guests, setGuests] = useState(initialGuests)
 
   const finalCheckOut = useMemo(() => addDays(checkIn, days), [checkIn, days])
   const total = days * hotel.pricePerNight
@@ -183,6 +172,17 @@ function BookingInformationPage() {
       </div>
     </div>
   )
+}
+
+function BookingInformationPage() {
+  const { slug } = useParams<{ slug: string }>()
+  const hotel = hotels.find((item) => item.slug === slug)
+
+  if (!hotel) {
+    return <Navigate replace to="/hotels" />
+  }
+
+  return <BookingInformationContent key={hotel.slug} hotel={hotel} />
 }
 
 export default BookingInformationPage

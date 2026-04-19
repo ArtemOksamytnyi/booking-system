@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { hotels } from '../../data/hotels'
+import { useUiStore } from '../../store/uiStore'
+import type { OwnerDashboardTab } from '../../store/uiStore'
 
-type OwnerTab = 'dashboard' | 'hotels' | 'bookings' | 'messages' | 'settings'
-
-const tabItems: Array<{ id: OwnerTab; label: string }> = [
+const tabItems: Array<{ id: OwnerDashboardTab; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'hotels', label: 'Hotel Management' },
   { id: 'bookings', label: 'Bookings' },
@@ -14,31 +13,13 @@ const tabItems: Array<{ id: OwnerTab; label: string }> = [
 
 function OwnerDashboardPage() {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<OwnerTab>('hotels')
-  const [hotelName, setHotelName] = useState('')
-
-  const [ownedHotels, setOwnedHotels] = useState(() => hotels.slice(0, 4))
-
-  const addHotel = () => {
-    if (!hotelName.trim()) {
-      return
-    }
-
-    const sample = hotels[Math.floor(Math.random() * hotels.length)]
-    setOwnedHotels((current) => [
-      {
-        ...sample,
-        slug: `${sample.slug}-${Date.now()}`,
-        name: hotelName.trim(),
-      },
-      ...current,
-    ])
-    setHotelName('')
-  }
-
-  const removeHotel = (slug: string) => {
-    setOwnedHotels((current) => current.filter((item) => item.slug !== slug))
-  }
+  const activeTab = useUiStore((state) => state.ownerDashboardTab)
+  const setActiveTab = useUiStore((state) => state.setOwnerDashboardTab)
+  const hotelName = useUiStore((state) => state.ownerHotelNameDraft)
+  const setHotelName = useUiStore((state) => state.setOwnerHotelNameDraft)
+  const ownedHotels = useUiStore((state) => state.ownedHotels)
+  const addHotel = useUiStore((state) => state.addOwnedHotel)
+  const removeHotel = useUiStore((state) => state.removeOwnedHotel)
 
   const avgRating = useMemo(
     () => (ownedHotels.length ? (ownedHotels.reduce((sum, h) => sum + h.rating, 0) / ownedHotels.length).toFixed(1) : '0.0'),

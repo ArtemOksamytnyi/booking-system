@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { hotels } from '../data/hotels'
 import type { HotelCategory } from '../data/hotels'
+import { useUiStore } from '../store/uiStore'
 
 const categories: Array<'All' | HotelCategory> = [
   'All',
@@ -17,13 +18,10 @@ const minPrice = 60
 const maxPrice = 300
 
 function HotelsPage() {
-  const [search, setSearch] = useState('')
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
-  const [category, setCategory] = useState<'All' | HotelCategory>('All')
-  const [city, setCity] = useState('All')
-  const [maxNightPrice, setMaxNightPrice] = useState(maxPrice)
-  const [minRating, setMinRating] = useState(0)
-  const [sortBy, setSortBy] = useState('recommended')
+  const hotelFilters = useUiStore((state) => state.hotelFilters)
+  const updateHotelFilters = useUiStore((state) => state.updateHotelFilters)
+  const resetHotelFilters = useUiStore((state) => state.resetHotelFilters)
+  const { search, isAdvancedOpen, category, city, maxNightPrice, minRating, sortBy } = hotelFilters
 
   const cities = useMemo(() => ['All', ...new Set(hotels.map((hotel) => hotel.city))], [])
 
@@ -58,15 +56,6 @@ function HotelsPage() {
       })
   }, [search, category, city, maxNightPrice, minRating, sortBy])
 
-  const resetFilters = () => {
-    setSearch('')
-    setCategory('All')
-    setCity('All')
-    setMaxNightPrice(maxPrice)
-    setMinRating(0)
-    setSortBy('recommended')
-  }
-
   return (
     <div className="section-container space-y-8 py-12 pb-16">
       <section className="rounded-3xl bg-white p-8 shadow-sm shadow-slate-200">
@@ -79,13 +68,13 @@ function HotelsPage() {
         <div className="mt-7 flex flex-col gap-3 md:flex-row">
           <input
             className="h-12 flex-1 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => updateHotelFilters({ search: event.target.value })}
             placeholder="Search by name or location"
             value={search}
           />
           <button
             className="h-12 rounded-xl border border-blue-200 bg-blue-50 px-5 text-sm font-semibold text-primary transition hover:bg-blue-100"
-            onClick={() => setIsAdvancedOpen((current) => !current)}
+            onClick={() => updateHotelFilters({ isAdvancedOpen: !isAdvancedOpen })}
             type="button"
           >
             {isAdvancedOpen ? 'Hide Advanced Filters' : 'Open Advanced Filters'}
@@ -98,7 +87,9 @@ function HotelsPage() {
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Category</span>
               <select
                 className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
-                onChange={(event) => setCategory(event.target.value as 'All' | HotelCategory)}
+                onChange={(event) =>
+                  updateHotelFilters({ category: event.target.value as 'All' | HotelCategory })
+                }
                 value={category}
               >
                 {categories.map((item) => (
@@ -113,7 +104,7 @@ function HotelsPage() {
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">City</span>
               <select
                 className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
-                onChange={(event) => setCity(event.target.value)}
+                onChange={(event) => updateHotelFilters({ city: event.target.value })}
                 value={city}
               >
                 {cities.map((item) => (
@@ -130,7 +121,11 @@ function HotelsPage() {
               </span>
               <select
                 className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
-                onChange={(event) => setSortBy(event.target.value)}
+                onChange={(event) =>
+                  updateHotelFilters({
+                    sortBy: event.target.value as 'recommended' | 'rating' | 'price-asc' | 'price-desc',
+                  })
+                }
                 value={sortBy}
               >
                 <option value="recommended">Recommended</option>
@@ -148,7 +143,7 @@ function HotelsPage() {
                 className="accent-primary"
                 max={maxPrice}
                 min={minPrice}
-                onChange={(event) => setMaxNightPrice(Number(event.target.value))}
+                onChange={(event) => updateHotelFilters({ maxNightPrice: Number(event.target.value) })}
                 type="range"
                 value={maxNightPrice}
               />
@@ -162,7 +157,7 @@ function HotelsPage() {
                 className="accent-primary"
                 max={5}
                 min={0}
-                onChange={(event) => setMinRating(Number(event.target.value))}
+                onChange={(event) => updateHotelFilters({ minRating: Number(event.target.value) })}
                 step={0.1}
                 type="range"
                 value={minRating}
@@ -172,7 +167,7 @@ function HotelsPage() {
             <div className="flex items-end">
               <button
                 className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                onClick={resetFilters}
+                onClick={resetHotelFilters}
                 type="button"
               >
                 Reset Filters

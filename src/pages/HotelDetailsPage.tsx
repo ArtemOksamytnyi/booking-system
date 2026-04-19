@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useBooking } from '../context/BookingContext'
 import { hotels } from '../data/hotels'
@@ -9,26 +9,16 @@ const getDateOffset = (offset = 0) => {
   return date.toISOString().split('T')[0]
 }
 
-function HotelDetailsPage() {
-  const { slug } = useParams<{ slug: string }>()
+type HotelDetailsContentProps = {
+  hotel: (typeof hotels)[number]
+}
+
+function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
   const navigate = useNavigate()
   const { startDraft } = useBooking()
-
-  const hotel = hotels.find((item) => item.slug === slug)
-
   const [checkIn, setCheckIn] = useState(getDateOffset(1))
   const [checkOut, setCheckOut] = useState(getDateOffset(3))
   const [guests, setGuests] = useState(2)
-
-  useEffect(() => {
-    setCheckIn(getDateOffset(1))
-    setCheckOut(getDateOffset(3))
-    setGuests(2)
-  }, [slug])
-
-  if (!hotel) {
-    return <Navigate replace to="/hotels" />
-  }
 
   const similarHotels = hotels.filter((item) => item.slug !== hotel.slug).slice(0, 3)
 
@@ -182,6 +172,17 @@ function HotelDetailsPage() {
       </section>
     </div>
   )
+}
+
+function HotelDetailsPage() {
+  const { slug } = useParams<{ slug: string }>()
+  const hotel = hotels.find((item) => item.slug === slug)
+
+  if (!hotel) {
+    return <Navigate replace to="/hotels" />
+  }
+
+  return <HotelDetailsContent key={hotel.slug} hotel={hotel} />
 }
 
 export default HotelDetailsPage

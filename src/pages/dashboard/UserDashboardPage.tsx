@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateRange, useBooking } from '../../context/BookingContext'
+import { useUiStore } from '../../store/uiStore'
+import type { UserDashboardTab } from '../../store/uiStore'
 
-type UserTab = 'dashboard' | 'bookings' | 'refunds' | 'messages' | 'help' | 'settings'
-
-const tabItems: Array<{ id: UserTab; label: string }> = [
+const tabItems: Array<{ id: UserDashboardTab; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'bookings', label: 'Bookings' },
   { id: 'refunds', label: 'Refunds' },
@@ -16,7 +16,8 @@ const tabItems: Array<{ id: UserTab; label: string }> = [
 function UserDashboardPage() {
   const { user } = useAuth()
   const { getUserBookings } = useBooking()
-  const [activeTab, setActiveTab] = useState<UserTab>('bookings')
+  const activeTab = useUiStore((state) => state.userDashboardTab)
+  const setActiveTab = useUiStore((state) => state.setUserDashboardTab)
 
   const bookings = useMemo(() => (user ? getUserBookings(user.email) : []), [user, getUserBookings])
 
