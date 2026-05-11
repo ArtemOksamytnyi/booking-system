@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { getAvailableRooms, getProperties, getPropertyById, getPropertyIdFromSlug } from '../api/properties'
 import { useBooking } from '../context/BookingContext'
-import { hotels } from '../data/hotels'
+import type { Hotel } from '../types/hotel'
 
 const getDateOffset = (offset = 0) => {
   const date = new Date()
@@ -9,8 +11,14 @@ const getDateOffset = (offset = 0) => {
   return date.toISOString().split('T')[0]
 }
 
+const addDays = (date: string, offset: number) => {
+  const next = new Date(`${date}T00:00:00`)
+  next.setDate(next.getDate() + offset)
+  return next.toISOString().split('T')[0]
+}
+
 type HotelDetailsContentProps = {
-  hotel: (typeof hotels)[number]
+  hotel: Hotel
 }
 
 function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
@@ -19,9 +27,19 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
   const [checkIn, setCheckIn] = useState(getDateOffset(1))
   const [checkOut, setCheckOut] = useState(getDateOffset(3))
   const [guests, setGuests] = useState(2)
+  const [isRoomsModalOpen, setIsRoomsModalOpen] = useState(false)
+  const { data: allHotels = [] } = useQuery({
+    queryKey: ['properties', 'details-similar'],
+    queryFn: () => getProperties(),
+  })
 
-  const similarHotels = hotels.filter((item) => item.slug !== hotel.slug).slice(0, 3)
+  const availableRoomsQuery = useQuery({
+    queryKey: ['available-rooms', hotel.id, checkIn, checkOut, guests],
+    queryFn: () => getAvailableRooms(hotel.id, { checkIn, checkOut, guests }),
+    enabled: isRoomsModalOpen,
+  })
 
+  const similarHotels = allHotels.filter((item) => item.id !== hotel.id).slice(0, 3)
   const days = useMemo(() => {
     const start = new Date(`${checkIn}T00:00:00`).getTime()
     const end = new Date(`${checkOut}T00:00:00`).getTime()
@@ -31,13 +49,30 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
 
   const total = days * hotel.pricePerNight
 
-  const onReserve = () => {
+  const onOpenRooms = () => {
+    setIsRoomsModalOpen(true)
+  }
+
+  const onSelectRoom = (roomId: number) => {
+    const selectedRoom = availableRoomsQuery.data?.rooms.find((room) => room.id === roomId)
+    if (!selectedRoom) {
+      return
+    }
+
     startDraft({
+      propertyId: hotel.id,
       hotelSlug: hotel.slug,
+      hotelName: hotel.name,
+      location: hotel.location,
+      image: hotel.image,
+      roomId: selectedRoom.id,
+      roomName: selectedRoom.name,
+      roomPricePerNight: selectedRoom.pricePerNight,
       checkIn,
       checkOut,
       guests,
     })
+    setIsRoomsModalOpen(false)
     navigate(`/booking/${hotel.slug}`)
   }
 
@@ -59,7 +94,7 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
             </div>
             <h1 className="text-4xl font-semibold text-slate-900">{hotel.name}</h1>
             <div className="flex items-center gap-6 text-sm">
-              <span className="font-semibold text-amber-500">★ {hotel.rating}</span>
+              <span className="font-semibold text-amber-500">★ {hotel.rating.toFixed(1)}</span>
               <span className="text-slate-500">{hotel.reviews} reviews</span>
               <span className="font-semibold text-slate-800">${hotel.pricePerNight}/night</span>
             </div>
@@ -73,7 +108,16 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Check-in</span>
             <input
               className="h-11 rounded-xl border border-slate-200 px-4 outline-none focus:border-primary"
-              onChange={(event) => setCheckIn(event.target.value)}
+              onChange={(event) => {
+                const nextCheckIn = event.target.value
+                const currentCheckOut = new Date(`${checkOut}T00:00:00`).getTime()
+                const nextCheckInTime = new Date(`${nextCheckIn}T00:00:00`).getTime()
+
+                setCheckIn(nextCheckIn)
+                if (nextCheckInTime >= currentCheckOut) {
+                  setCheckOut(addDays(nextCheckIn, 1))
+                }
+              }}
               type="date"
               value={checkIn}
             />
@@ -106,46 +150,46 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
               <span className="font-semibold text-slate-900">{days}</span> days
             </p>
             <p className="mt-1">
-              Total: <span className="font-semibold text-slate-900">${total}</span>
+              From: <span className="font-semibold text-slate-900">${total}</span>
             </p>
           </div>
 
           <button
             className="h-12 w-full rounded-xl bg-primary text-sm font-semibold text-white transition hover:bg-blue-700"
-            onClick={onReserve}
+            onClick={onOpenRooms}
             type="button"
           >
-            Reserve Now
+            Check Available Rooms
           </button>
         </aside>
       </section>
 
       <section className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
         <article className="rounded-3xl bg-white p-7 shadow-sm shadow-slate-200">
-          <h2 className="text-3xl font-semibold text-slate-900">Amenities</h2>
+          <h2 className="text-3xl font-semibold text-slate-900">Available Room Types</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {hotel.amenities.map((amenity) => (
+            {hotel.rooms.map((room) => (
               <div
-                key={amenity}
+                key={room.id}
                 className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700"
               >
-                {amenity}
+                {room.name} · up to {room.capacity} guests · ${room.pricePerNight}/night
               </div>
             ))}
           </div>
         </article>
 
         <article className="rounded-3xl bg-white p-7 shadow-sm shadow-slate-200">
-          <h2 className="text-3xl font-semibold text-slate-900">Gallery</h2>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            {hotel.gallery.map((image, index) => (
-              <img
-                key={`${hotel.slug}-${index}`}
-                alt={`${hotel.name} gallery ${index + 1}`}
-                className={`h-40 w-full rounded-xl object-cover ${index === 0 ? 'col-span-2 h-48' : ''}`}
-                src={image}
-              />
-            ))}
+          <h2 className="text-3xl font-semibold text-slate-900">Hotel Snapshot</h2>
+          <div className="mt-5 grid gap-3">
+            <img
+              alt={hotel.name}
+              className="h-48 w-full rounded-xl object-cover"
+              src={hotel.image}
+            />
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <p>{hotel.description}</p>
+            </div>
           </div>
         </article>
       </section>
@@ -154,7 +198,7 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
         <h2 className="text-3xl font-semibold text-slate-900">Similar Hotels</h2>
         <div className="grid gap-6 md:grid-cols-3">
           {similarHotels.map((item) => (
-            <article key={item.slug} className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
+            <article key={item.id} className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
               <img alt={item.name} className="h-44 w-full object-cover" src={item.image} />
               <div className="space-y-2 p-5">
                 <h3 className="text-xl font-semibold text-slate-900">{item.name}</h3>
@@ -170,13 +214,97 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
           ))}
         </div>
       </section>
+
+      {isRoomsModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl shadow-slate-900/20">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-primary">
+                  Available rooms
+                </p>
+                <h3 className="mt-2 text-3xl font-semibold text-slate-900">{hotel.name}</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  {checkIn} to {checkOut}, {guests} {guests === 1 ? 'guest' : 'guests'}
+                </p>
+              </div>
+              <button
+                className="rounded-full border border-slate-200 px-3 py-1 text-sm font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
+                onClick={() => setIsRoomsModalOpen(false)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {availableRoomsQuery.isLoading ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center text-slate-500">
+                  Checking room availability...
+                </div>
+              ) : availableRoomsQuery.data && availableRoomsQuery.data.rooms.length > 0 ? (
+                availableRoomsQuery.data.rooms.map((room) => (
+                  <div
+                    key={room.id}
+                    className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div>
+                      <p className="text-2xl font-semibold text-slate-900">{room.name}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Up to {room.capacity} guests · ${room.pricePerNight} / night
+                      </p>
+                    </div>
+                    <button
+                      className="h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                      onClick={() => onSelectRoom(room.id)}
+                      type="button"
+                    >
+                      Choose room
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-slate-500">
+                  There are no available rooms for the selected dates. Try different dates or a
+                  smaller guest count.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
 
 function HotelDetailsPage() {
   const { slug } = useParams<{ slug: string }>()
-  const hotel = hotels.find((item) => item.slug === slug)
+  const propertyId = slug ? getPropertyIdFromSlug(slug) : null
+  const { data: hotel, isLoading, isError } = useQuery({
+    queryKey: ['property', propertyId],
+    queryFn: () => getPropertyById(propertyId!),
+    enabled: propertyId !== null,
+  })
+
+  if (!propertyId) {
+    return <Navigate replace to="/hotels" />
+  }
+
+  if (isLoading) {
+    return (
+      <div className="section-container py-20 text-center text-slate-500">Loading hotel details...</div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="section-container py-20">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-600">
+          Unable to load hotel details from the database.
+        </div>
+      </div>
+    )
+  }
 
   if (!hotel) {
     return <Navigate replace to="/hotels" />

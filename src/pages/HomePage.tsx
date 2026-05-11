@@ -1,6 +1,8 @@
-import { Link } from 'react-router-dom'
-import { highlights, hotels } from '../data/hotels'
 import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router-dom'
+import { getHighlightsFromHotels, getProperties } from '../api/properties'
+import { useUiStore } from '../store/uiStore'
 
 const StatIcon = ({ path }: { path: string }) => (
   <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-primary" fill="none" strokeWidth="1.8">
@@ -8,10 +10,30 @@ const StatIcon = ({ path }: { path: string }) => (
   </svg>
 )
 
-function HomePage() {
+const addDays = (date: string, offset: number) => {
+  const next = new Date(`${date}T00:00:00`)
+  next.setDate(next.getDate() + offset)
+  return next.toISOString().split('T')[0]
+}
 
-  const cities = useMemo(() => ['All', ...new Set(hotels.map((hotel) => hotel.city))], [])
-  
+function HomePage() {
+  const navigate = useNavigate()
+  const hotelFilters = useUiStore((state) => state.hotelFilters)
+  const updateHotelFilters = useUiStore((state) => state.updateHotelFilters)
+  const { data: hotels = [], isLoading } = useQuery({
+    queryKey: ['properties', 'home'],
+    queryFn: () => getProperties(),
+  })
+
+  const cities = useMemo(() => ['All', ...new Set(hotels.map((hotel) => hotel.city))], [hotels])
+  const highlights = useMemo(() => getHighlightsFromHotels(hotels), [hotels])
+  const featuredHotels = useMemo(() => hotels.slice(0, 8), [hotels])
+  const { city, checkIn, checkOut, guests } = hotelFilters
+
+  const submitSearch = () => {
+    navigate('/hotels')
+  }
+
   return (
     <div className="section-container space-y-20 py-12 pb-16">
       <section className="grid gap-12 lg:grid-cols-2">
@@ -44,8 +66,8 @@ function HomePage() {
                 <StatIcon path="M8 7h8m-7 4h6m5-1a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM9 7h6v8H9z" />
               </div>
               <p className="text-sm">
-                <span className="font-semibold text-slate-900">200</span>{' '}
-                <span className="text-slate-400">treosure</span>
+                <span className="font-semibold text-slate-900">{hotels.length || 0}</span>{' '}
+                <span className="text-slate-400">properties</span>
               </p>
             </div>
             <div className="space-y-1">
@@ -53,7 +75,7 @@ function HomePage() {
                 <StatIcon path="M12 22s7-5.5 7-12a7 7 0 1 0-14 0c0 6.5 7 12 7 12Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
               </div>
               <p className="text-sm">
-                <span className="font-semibold text-slate-900">100</span>{' '}
+                <span className="font-semibold text-slate-900">{cities.length - 1 || 0}</span>{' '}
                 <span className="text-slate-400">cities</span>
               </p>
             </div>
@@ -63,7 +85,10 @@ function HomePage() {
         <div className="relative mx-auto w-full max-w-[560px] pt-2">
           <div className="absolute right-0 top-12 h-[360px] w-[90%] rounded-2xl border border-slate-300" />
           <img
-            src="https://images.unsplash.com/photo-1616594039964-8b8f66f9f6f0?auto=format&fit=crop&w=1200&q=80"
+            src={
+              featuredHotels[0]?.image ??
+              'https://images.unsplash.com/photo-1616594039964-8b8f66f9f6f0?auto=format&fit=crop&w=1200&q=80'
+            }
             alt="Room with warm sunlight"
             className="relative z-10 h-[360px] w-full rounded-2xl object-cover"
           />
@@ -71,73 +96,106 @@ function HomePage() {
       </section>
 
       <section className="rounded-3xl bg-[#eaf0ff] px-5 py-5 shadow-sm md:px-7">
-        <div className="grid gap-3 md:grid-cols-4">
-          <button className="flex h-14 items-center justify-center gap-3 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 shadow-md shadow-slate-300/70">
-            <span>📅</span> Check Available
-          </button>
-          <select className="flex h-14 items-center justify-center gap-3 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 shadow-md shadow-slate-300/70">
-            <span>👤</span> Person <span className="text-slate-400">2</span> <span>⌄</span>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_0.9fr_auto]">
+          <select
+            className="h-14 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 shadow-md shadow-slate-300/70 outline-none transition focus:ring-2 focus:ring-primary/20"
+            onChange={(event) => updateHotelFilters({ city: event.target.value })}
+            value={city}
+          >
+            {cities.map((item) => (
+              <option key={item} value={item}>
+                {item === 'All' ? 'Select location' : item}
+              </option>
+            ))}
           </select>
-          <select className="flex h-14 items-center justify-center gap-3 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 shadow-md shadow-slate-300/70">
-            {cities.map(city => {
-              return (<option>{city}</option>)
-            })}
-            <span>📍</span> Select Location
+          <input
+            className="h-14 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 shadow-md shadow-slate-300/70 outline-none transition focus:ring-2 focus:ring-primary/20"
+            min={new Date().toISOString().split('T')[0]}
+            onChange={(event) => {
+              const nextCheckIn = event.target.value
+              updateHotelFilters({
+                checkIn: nextCheckIn,
+                checkOut: nextCheckIn >= checkOut ? addDays(nextCheckIn, 1) : checkOut,
+              })
+            }}
+            type="date"
+            value={checkIn}
+          />
+          <input
+            className="h-14 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 shadow-md shadow-slate-300/70 outline-none transition focus:ring-2 focus:ring-primary/20"
+            min={checkIn}
+            onChange={(event) => updateHotelFilters({ checkOut: event.target.value })}
+            type="date"
+            value={checkOut}
+          />
+          <select
+            className="h-14 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 shadow-md shadow-slate-300/70 outline-none transition focus:ring-2 focus:ring-primary/20"
+            onChange={(event) => updateHotelFilters({ guests: Number(event.target.value) })}
+            value={guests}
+          >
+            {[1, 2, 3, 4, 5].map((value) => (
+              <option key={value} value={value}>
+                {value} {value === 1 ? 'guest' : 'guests'}
+              </option>
+            ))}
           </select>
-          <Link
-            className="grid h-14 place-items-center rounded-xl bg-primary text-base font-semibold text-white shadow-lg shadow-blue-300/70 transition hover:bg-blue-700"
-            to="/hotels"
+          <button
+            className="grid h-14 place-items-center rounded-xl bg-primary px-7 text-base font-semibold text-white shadow-lg shadow-blue-300/70 transition hover:bg-blue-700"
+            onClick={submitSearch}
+            type="button"
           >
             Search
-          </Link>
+          </button>
         </div>
       </section>
 
       <section className="space-y-6">
         <h2 className="text-3xl font-semibold text-slate-900">Most Picked</h2>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {highlights.map((item) => (
-            <article
-              key={item.name}
-              className={`group relative overflow-hidden rounded-2xl ${item.tall ? 'h-full min-h-[420px] lg:row-span-2' : 'min-h-[200px]'}`}
-            >
-              <img
-                src={item.image}
-                alt={item.name}
-                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/0" />
-              <div className="absolute right-0 top-0 rounded-bl-xl bg-primary px-5 py-2 text-sm font-medium text-white">
-                {item.price}
-              </div>
-              <div className="absolute bottom-5 left-5 text-white">
-                <p className="text-2xl font-medium">{item.name}</p>
-                <p className="text-sm text-white/80">{item.location}</p>
-              </div>
-            </article>
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="rounded-2xl bg-white p-10 text-center text-slate-500">Loading properties...</div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-3">
+            {highlights.map((item) => (
+              <article
+                key={item.id}
+                className={`group relative overflow-hidden rounded-2xl ${item.tall ? 'h-full min-h-[420px] lg:row-span-2' : 'min-h-[200px]'}`}
+              >
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/0" />
+                <div className="absolute right-0 top-0 rounded-bl-xl bg-primary px-5 py-2 text-sm font-medium text-white">
+                  {item.price}
+                </div>
+                <div className="absolute bottom-5 left-5 text-white">
+                  <p className="text-2xl font-medium">{item.name}</p>
+                  <p className="text-sm text-white/80">{item.location}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-        {hotels.map((hotel) => (
-          <article key={hotel.slug} className="space-y-4">
+        {featuredHotels.map((hotel) => (
+          <article key={hotel.id} className="space-y-4">
             <div className="group relative overflow-hidden rounded-2xl">
               <img
                 src={hotel.image}
                 alt={hotel.name}
                 className="h-40 w-full object-cover transition duration-500 group-hover:scale-105"
               />
-              {hotel.tag ? (
-                <span className="absolute right-0 top-0 rounded-bl-xl bg-primary px-4 py-2 text-xs font-medium text-white">
-                  {hotel.tag}
-                </span>
-              ) : null}
             </div>
             <div>
               <h3 className="text-2xl font-medium text-slate-900">{hotel.name}</h3>
               <p className="text-sm text-slate-400">{hotel.location}</p>
-              <Link className="mt-2 inline-flex text-sm font-semibold text-primary hover:underline" to={`/hotels/${hotel.slug}`}>
+              <Link
+                className="mt-2 inline-flex text-sm font-semibold text-primary hover:underline"
+                to={`/hotels/${hotel.slug}`}
+              >
                 View details
               </Link>
             </div>

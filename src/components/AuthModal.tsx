@@ -20,6 +20,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
   const [role, setRole] = useState<AuthRole>('user')
   const [idDocument, setIdDocument] = useState<File | null>(null)
   const [propertyDocument, setPropertyDocument] = useState<File | null>(null)
+  const [propertyName, setPropertyName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const isRegister = mode === 'register'
@@ -43,6 +44,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
           email,
           password,
           role,
+          propertyName,
           documents: isOwnerRegistration
             ? [idDocument?.name ?? '', propertyDocument?.name ?? '']
             : [],
@@ -69,7 +71,8 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
             <h2 className="mt-2 text-3xl font-semibold text-slate-900">{title}</h2>
             {!isRegister ? (
               <p className="mt-2 text-xs text-slate-500">
-                Demo: user@lankastay.com/user123, owner@lankastay.com/owner123, admin@lankastay.com/admin123
+                Demo: user@lankastay.com/password123, ina.owner@lankastay.com/password123,
+                admin@lankastay.com/password123
               </p>
             ) : null}
           </div>
@@ -141,6 +144,16 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-semibold text-slate-700">Owner verification documents</p>
               <label className="grid gap-2">
+                <span className="text-xs text-slate-500">Property name</span>
+                <input
+                  className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                  onChange={(event) => setPropertyName(event.target.value)}
+                  placeholder="Azure Retreat"
+                  required
+                  value={propertyName}
+                />
+              </label>
+              <label className="grid gap-2">
                 <span className="text-xs text-slate-500">Identity document</span>
                 <input
                   accept=".pdf,.jpg,.jpeg,.png"
@@ -168,8 +181,8 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
 
           <button
             className="h-12 w-full rounded-xl bg-primary text-sm font-semibold text-white transition hover:bg-blue-700"
-            type="submit"
-          >
+          type="submit"
+        >
             {submitText}
           </button>
         </form>

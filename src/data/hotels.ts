@@ -21,7 +21,22 @@ export type Hotel = {
   reviews: number
   description: string
   amenities: string[]
+  rooms: HotelRoom[]
   tag?: string
+}
+
+export type HotelRoomType = 'звичайна' | 'люкс' | 'супер люкс'
+
+export type HotelRoom = {
+  id: string
+  name: HotelRoomType
+  capacity: number
+  pricePerNight: number
+  isActive: boolean
+  unavailableRanges: Array<{
+    start: string
+    end: string
+  }>
 }
 
 export type RoomCard = {
@@ -31,6 +46,36 @@ export type RoomCard = {
   image: string
   price: string
 }
+
+const createRooms = (hotelSlug: string, basePrice: number, seed = 0): HotelRoom[] => [
+  {
+    id: `${hotelSlug}-standard`,
+    name: 'звичайна',
+    capacity: 2,
+    pricePerNight: basePrice,
+    isActive: true,
+    unavailableRanges: [
+      { start: '2026-05-14', end: '2026-05-17' },
+      { start: `2026-06-${String(6 + seed).padStart(2, '0')}`, end: `2026-06-${String(8 + seed).padStart(2, '0')}` },
+    ],
+  },
+  {
+    id: `${hotelSlug}-lux`,
+    name: 'люкс',
+    capacity: 3,
+    pricePerNight: basePrice + 35,
+    isActive: true,
+    unavailableRanges: [{ start: `2026-06-${String(12 + seed).padStart(2, '0')}`, end: `2026-06-${String(15 + seed).padStart(2, '0')}` }],
+  },
+  {
+    id: `${hotelSlug}-super-lux`,
+    name: 'супер люкс',
+    capacity: 5,
+    pricePerNight: basePrice + 80,
+    isActive: true,
+    unavailableRanges: [{ start: `2026-05-${String(21 + seed).padStart(2, '0')}`, end: `2026-05-${String(24 + seed).padStart(2, '0')}` }],
+  },
+]
 
 export const highlights: HighlightCard[] = [
   {
@@ -92,6 +137,7 @@ export const hotels: Hotel[] = [
     description:
       'A premium city hotel with skyline views, spa facilities, and quick access to business districts.',
     amenities: ['Infinity Pool', 'Airport Transfer', 'Free Breakfast', 'Spa', 'Wi-Fi'],
+    rooms: createRooms('shangri-la-colombo', 180, 0),
   },
   {
     slug: 'top-view-hikkaduwa',
@@ -111,6 +157,7 @@ export const hotels: Hotel[] = [
     reviews: 214,
     description: 'A bright coastal resort with ocean-facing suites and direct beach access.',
     amenities: ['Beachfront', 'Surf Lessons', 'Restaurant', 'Wi-Fi'],
+    rooms: createRooms('top-view-hikkaduwa', 120, 1),
   },
   {
     slug: 'green-villa-kandy',
@@ -130,6 +177,7 @@ export const hotels: Hotel[] = [
     reviews: 167,
     description: 'A quiet garden villa in the hills with panoramic terraces and local cuisine.',
     amenities: ['Mountain View', 'Garden', 'Room Service', 'Free Parking'],
+    rooms: createRooms('green-villa-kandy', 94, 2),
   },
   {
     slug: 'wodden-pit-ambalangode',
@@ -149,6 +197,7 @@ export const hotels: Hotel[] = [
     reviews: 283,
     description: 'Family-focused villas with wide living spaces, kid-safe zones, and private kitchens.',
     amenities: ['Family Rooms', 'Kids Area', 'Kitchen', 'Pool'],
+    rooms: createRooms('wodden-pit-ambalangode', 136, 3),
   },
   {
     slug: 'boutiqe-kandy',
@@ -168,6 +217,7 @@ export const hotels: Hotel[] = [
     reviews: 122,
     description: 'A boutique stay with modern interiors, dedicated work lounge, and fast internet.',
     amenities: ['Cowork Area', 'Coffee Bar', 'Fast Wi-Fi', 'Meeting Room'],
+    rooms: createRooms('boutiqe-kandy', 110, 4),
   },
   {
     slug: 'modern-nuwerliya',
@@ -187,6 +237,7 @@ export const hotels: Hotel[] = [
     reviews: 98,
     description: 'Minimalist apartments with strong heating and scenic tea-country views.',
     amenities: ['Heated Rooms', 'Mountain Deck', 'Laundry', 'Wi-Fi'],
+    rooms: createRooms('modern-nuwerliya', 102, 5),
   },
   {
     slug: 'silver-rain-dehiwala',
@@ -206,6 +257,7 @@ export const hotels: Hotel[] = [
     reviews: 74,
     description: 'City apartments with smooth check-in and excellent access to restaurants and transit.',
     amenities: ['Self Check-in', 'Balcony', 'Kitchenette', 'Wi-Fi'],
+    rooms: createRooms('silver-rain-dehiwala', 86, 6),
   },
   {
     slug: 'cashville-ampara',
@@ -227,6 +279,7 @@ export const hotels: Hotel[] = [
     description:
       'Signature villa complex with private courtyards, chef service, and high-end interiors.',
     amenities: ['Private Chef', 'Concierge', 'Pool', 'Airport Pickup'],
+    rooms: createRooms('cashville-ampara', 165, 7),
   },
   {
     slug: 'ocean-land-trincomalee',
@@ -246,6 +299,7 @@ export const hotels: Hotel[] = [
     reviews: 201,
     description: 'Oceanfront suites with private decks and sunset dining.',
     amenities: ['Beachfront', 'Sunset Deck', 'Breakfast', 'Wi-Fi'],
+    rooms: createRooms('ocean-land-trincomalee', 132, 8),
   },
   {
     slug: 'stark-house-dehiwala',
@@ -265,6 +319,7 @@ export const hotels: Hotel[] = [
     reviews: 133,
     description: 'Elegant city house with conference zones and premium dining.',
     amenities: ['Conference Room', 'Restaurant', 'Gym', 'Wi-Fi'],
+    rooms: createRooms('stark-house-dehiwala', 145, 9),
   },
   {
     slug: 'vinna-vill-beruwala',
@@ -284,6 +339,7 @@ export const hotels: Hotel[] = [
     reviews: 84,
     description: 'Relaxed family villas with tropical gardens and game spaces.',
     amenities: ['Family Zone', 'Garden', 'Breakfast', 'Pool'],
+    rooms: createRooms('vinna-vill-beruwala', 98, 10),
   },
   {
     slug: 'sunrise-reef-galle',
@@ -303,6 +359,7 @@ export const hotels: Hotel[] = [
     reviews: 277,
     description: 'Modern reef-view hotel with private beach service.',
     amenities: ['Private Beach', 'Spa', 'Pool Bar', 'Wi-Fi'],
+    rooms: createRooms('sunrise-reef-galle', 154, 11),
   },
   {
     slug: 'harbor-one-colombo',
@@ -322,6 +379,7 @@ export const hotels: Hotel[] = [
     reviews: 152,
     description: 'Business-friendly hotel with harbor views and fast check-in.',
     amenities: ['Meeting Room', 'Airport Shuttle', 'Breakfast', 'Wi-Fi'],
+    rooms: createRooms('harbor-one-colombo', 127, 12),
   },
   {
     slug: 'hill-crown-ella',
@@ -341,6 +399,7 @@ export const hotels: Hotel[] = [
     reviews: 171,
     description: 'Mountain property with iconic valley viewpoints.',
     amenities: ['Valley View', 'Hiking Tours', 'Breakfast', 'Fireplace'],
+    rooms: createRooms('hill-crown-ella', 115, 13),
   },
   {
     slug: 'azure-retreat-matara',
@@ -360,6 +419,7 @@ export const hotels: Hotel[] = [
     reviews: 325,
     description: 'Luxury retreat with private butler and signature experiences.',
     amenities: ['Butler Service', 'Private Pool', 'Fine Dining', 'Spa'],
+    rooms: createRooms('azure-retreat-matara', 198, 14),
   },
   {
     slug: 'city-nest-kotte',
@@ -379,6 +439,7 @@ export const hotels: Hotel[] = [
     reviews: 65,
     description: 'Compact modern rooms for short city stays and work trips.',
     amenities: ['Smart Lock', 'Fast Wi-Fi', 'Workspace', 'Laundry'],
+    rooms: createRooms('city-nest-kotte', 92, 15),
   },
 ]
 

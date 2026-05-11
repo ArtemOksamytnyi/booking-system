@@ -1,44 +1,52 @@
 import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { hotels } from '../data/hotels'
-import type { HotelCategory } from '../data/hotels'
+import { getProperties } from '../api/properties'
+import type { PropertyCategory } from '../types/hotel'
 import { useUiStore } from '../store/uiStore'
 
-const categories: Array<'All' | HotelCategory> = [
-  'All',
-  'Beach',
-  'Mountain',
-  'City',
-  'Family',
-  'Business',
-  'Luxury',
-]
+const categories: Array<'All' | PropertyCategory> = ['All', 'hotel', 'villa', 'apartment', 'resort']
 
 const minPrice = 60
-const maxPrice = 300
+const maxPrice = 400
+
+const addDays = (date: string, offset: number) => {
+  const next = new Date(`${date}T00:00:00`)
+  next.setDate(next.getDate() + offset)
+  return next.toISOString().split('T')[0]
+}
+
+const humanizeCategory = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 
 function HotelsPage() {
   const hotelFilters = useUiStore((state) => state.hotelFilters)
   const updateHotelFilters = useUiStore((state) => state.updateHotelFilters)
   const resetHotelFilters = useUiStore((state) => state.resetHotelFilters)
-  const { search, isAdvancedOpen, category, city, maxNightPrice, minRating, sortBy } = hotelFilters
+  const { search, isAdvancedOpen, category, city, checkIn, checkOut, guests, maxNightPrice, minRating, sortBy } =
+    hotelFilters
 
-  const cities = useMemo(() => ['All', ...new Set(hotels.map((hotel) => hotel.city))], [])
+  const queryFilters = useMemo(
+    () => ({
+      search,
+      category,
+      city,
+      checkIn,
+      checkOut,
+      guests,
+    }),
+    [search, category, city, checkIn, checkOut, guests],
+  )
+
+  const { data: hotels = [], isLoading, isError } = useQuery({
+    queryKey: ['properties', queryFilters],
+    queryFn: () => getProperties(queryFilters),
+  })
+
+  const cities = useMemo(() => ['All', ...new Set(hotels.map((hotel) => hotel.city))], [hotels])
 
   const filteredHotels = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase()
-
     return hotels
-      .filter((hotel) => {
-        const matchSearch =
-          hotel.name.toLowerCase().includes(normalizedSearch) ||
-          hotel.location.toLowerCase().includes(normalizedSearch)
-        const matchCategory = category === 'All' || hotel.category === category
-        const matchCity = city === 'All' || hotel.city === city
-        const matchPrice = hotel.pricePerNight <= maxNightPrice
-        const matchRating = hotel.rating >= minRating
-        return matchSearch && matchCategory && matchCity && matchPrice && matchRating
-      })
+      .filter((hotel) => hotel.pricePerNight <= maxNightPrice && hotel.rating >= minRating)
       .sort((a, b) => {
         if (sortBy === 'price-asc') {
           return a.pricePerNight - b.pricePerNight
@@ -54,7 +62,7 @@ function HotelsPage() {
 
         return b.reviews - a.reviews
       })
-  }, [search, category, city, maxNightPrice, minRating, sortBy])
+  }, [hotels, maxNightPrice, minRating, sortBy])
 
   return (
     <div className="section-container space-y-8 py-12 pb-16">
@@ -65,13 +73,48 @@ function HotelsPage() {
           Search all available hotels and use advanced filters for exact matching.
         </p>
 
-        <div className="mt-7 flex flex-col gap-3 md:flex-row">
+        <div className="mt-7 grid gap-3 lg:grid-cols-[1fr_0.7fr_0.7fr_0.6fr_auto]">
+          <select
+            className="h-12 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+            onChange={(event) => updateHotelFilters({ city: event.target.value })}
+            value={city}
+          >
+            {cities.map((item) => (
+              <option key={item} value={item}>
+                {item === 'All' ? 'Select location' : item}
+              </option>
+            ))}
+          </select>
           <input
-            className="h-12 flex-1 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
-            onChange={(event) => updateHotelFilters({ search: event.target.value })}
-            placeholder="Search by name or location"
-            value={search}
+            className="h-12 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+            min={new Date().toISOString().split('T')[0]}
+            onChange={(event) =>
+              updateHotelFilters({
+                checkIn: event.target.value,
+                checkOut: event.target.value >= checkOut ? addDays(event.target.value, 1) : checkOut,
+              })
+            }
+            type="date"
+            value={checkIn}
           />
+          <input
+            className="h-12 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+            min={checkIn}
+            onChange={(event) => updateHotelFilters({ checkOut: event.target.value })}
+            type="date"
+            value={checkOut}
+          />
+          <select
+            className="h-12 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+            onChange={(event) => updateHotelFilters({ guests: Number(event.target.value) })}
+            value={guests}
+          >
+            {[1, 2, 3, 4, 5].map((value) => (
+              <option key={value} value={value}>
+                {value} {value === 1 ? 'guest' : 'guests'}
+              </option>
+            ))}
+          </select>
           <button
             className="h-12 rounded-xl border border-blue-200 bg-blue-50 px-5 text-sm font-semibold text-primary transition hover:bg-blue-100"
             onClick={() => updateHotelFilters({ isAdvancedOpen: !isAdvancedOpen })}
@@ -84,35 +127,55 @@ function HotelsPage() {
         {isAdvancedOpen ? (
           <div className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 md:grid-cols-2 lg:grid-cols-3">
             <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search</span>
+              <input
+                className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                onChange={(event) => updateHotelFilters({ search: event.target.value })}
+                placeholder="Search by name or description"
+                value={search}
+              />
+            </label>
+
+            <label className="grid gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Category</span>
               <select
                 className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
                 onChange={(event) =>
-                  updateHotelFilters({ category: event.target.value as 'All' | HotelCategory })
+                  updateHotelFilters({ category: event.target.value as 'All' | PropertyCategory })
                 }
                 value={category}
               >
                 {categories.map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {item === 'All' ? item : humanizeCategory(item)}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="grid gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">City</span>
-              <select
-                className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
-                onChange={(event) => updateHotelFilters({ city: event.target.value })}
-                value={city}
-              >
-                {cities.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Stay dates</span>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(event) =>
+                    updateHotelFilters({
+                      checkIn: event.target.value,
+                      checkOut: event.target.value >= checkOut ? addDays(event.target.value, 1) : checkOut,
+                    })
+                  }
+                  type="date"
+                  value={checkIn}
+                />
+                <input
+                  className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                  min={checkIn}
+                  onChange={(event) => updateHotelFilters({ checkOut: event.target.value })}
+                  type="date"
+                  value={checkOut}
+                />
+              </div>
             </label>
 
             <label className="grid gap-2">
@@ -181,48 +244,53 @@ function HotelsPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filteredHotels.map((hotel) => (
-          <article
-            key={hotel.slug}
-            className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200"
-          >
-            <div className="group relative">
-              <img
-                src={hotel.image}
-                alt={hotel.name}
-                className="h-48 w-full object-cover transition duration-500 group-hover:scale-105"
-              />
-              {hotel.tag ? (
-                <span className="absolute right-0 top-0 rounded-bl-xl bg-primary px-4 py-2 text-xs font-medium text-white">
-                  {hotel.tag}
-                </span>
-              ) : null}
-            </div>
-            <div className="space-y-3 p-5">
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="text-2xl font-medium text-slate-900">{hotel.name}</h2>
-                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-primary">
-                  {hotel.category}
-                </span>
+      {isLoading ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">
+          Loading hotels...
+        </div>
+      ) : isError ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-10 text-center text-rose-600">
+          Unable to load hotels from the database.
+        </div>
+      ) : (
+        <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredHotels.map((hotel) => (
+            <article
+              key={hotel.id}
+              className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200"
+            >
+              <div className="group relative">
+                <img
+                  src={hotel.image}
+                  alt={hotel.name}
+                  className="h-48 w-full object-cover transition duration-500 group-hover:scale-105"
+                />
               </div>
-              <p className="text-sm text-slate-500">{hotel.location}</p>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-slate-800">${hotel.pricePerNight}/night</span>
-                <span className="text-amber-500">★ {hotel.rating}</span>
+              <div className="space-y-3 p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="text-2xl font-medium text-slate-900">{hotel.name}</h2>
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-primary">
+                    {humanizeCategory(hotel.category)}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500">{hotel.location}</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-800">${hotel.pricePerNight}/night</span>
+                  <span className="text-amber-500">★ {hotel.rating.toFixed(1)}</span>
+                </div>
+                <Link
+                  className="inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  to={`/hotels/${hotel.slug}`}
+                >
+                  View Details
+                </Link>
               </div>
-              <Link
-                className="inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                to={`/hotels/${hotel.slug}`}
-              >
-                View Details
-              </Link>
-            </div>
-          </article>
-        ))}
-      </section>
+            </article>
+          ))}
+        </section>
+      )}
 
-      {filteredHotels.length === 0 ? (
+      {!isLoading && !isError && filteredHotels.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
           No hotels found. Try changing search or filters.
         </div>

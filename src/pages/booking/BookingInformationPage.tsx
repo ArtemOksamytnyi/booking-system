@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { getPropertyById, getPropertyIdFromSlug } from '../../api/properties'
 import BookingHeader from '../../components/BookingHeader'
 import { useBooking } from '../../context/BookingContext'
-import { hotels } from '../../data/hotels'
+import type { Hotel } from '../../types/hotel'
 
 const addDays = (date: string, days: number) => {
   const next = new Date(`${date}T00:00:00`)
@@ -18,7 +20,7 @@ const diffDays = (checkIn: string, checkOut: string) => {
 }
 
 type BookingInformationContentProps = {
-  hotel: (typeof hotels)[number]
+  hotel: Hotel
 }
 
 function BookingInformationContent({ hotel }: BookingInformationContentProps) {
@@ -32,17 +34,28 @@ function BookingInformationContent({ hotel }: BookingInformationContentProps) {
   const initialCheckIn = draft?.hotelSlug === hotel.slug ? draft.checkIn : defaultCheckIn
   const initialDays = draft?.hotelSlug === hotel.slug ? diffDays(draft.checkIn, draft.checkOut) : 2
   const initialGuests = draft?.hotelSlug === hotel.slug ? draft.guests : 2
+  const roomPricePerNight =
+    draft?.hotelSlug === hotel.slug ? draft.roomPricePerNight : hotel.pricePerNight
+  const roomName = draft?.hotelSlug === hotel.slug ? draft.roomName : 'звичайна'
+  const roomId = draft?.hotelSlug === hotel.slug ? draft.roomId : hotel.rooms[0]?.id ?? 0
 
   const [checkIn, setCheckIn] = useState(initialCheckIn)
   const [days, setDays] = useState(initialDays)
   const [guests, setGuests] = useState(initialGuests)
 
   const finalCheckOut = useMemo(() => addDays(checkIn, days), [checkIn, days])
-  const total = days * hotel.pricePerNight
+  const total = days * roomPricePerNight
 
   const persistDraft = (nextCheckIn: string, nextDays: number, nextGuests: number) => {
     const payload = {
+      propertyId: hotel.id,
       hotelSlug: hotel.slug,
+      hotelName: hotel.name,
+      location: hotel.location,
+      image: hotel.image,
+      roomId,
+      roomName,
+      roomPricePerNight,
       checkIn: nextCheckIn,
       checkOut: addDays(nextCheckIn, nextDays),
       guests: nextGuests,
@@ -75,6 +88,9 @@ function BookingInformationContent({ hotel }: BookingInformationContentProps) {
             <p>{hotel.name}</p>
             <p className="text-base font-normal text-slate-400">{hotel.location}</p>
           </div>
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary">
+            Room type: {roomName}
+          </p>
         </article>
 
         <article className="space-y-4 lg:pl-2">
@@ -176,7 +192,20 @@ function BookingInformationContent({ hotel }: BookingInformationContentProps) {
 
 function BookingInformationPage() {
   const { slug } = useParams<{ slug: string }>()
-  const hotel = hotels.find((item) => item.slug === slug)
+  const propertyId = slug ? getPropertyIdFromSlug(slug) : null
+  const { data: hotel, isLoading } = useQuery({
+    queryKey: ['property', propertyId, 'booking'],
+    queryFn: () => getPropertyById(propertyId!),
+    enabled: propertyId !== null,
+  })
+
+  if (!propertyId) {
+    return <Navigate replace to="/hotels" />
+  }
+
+  if (isLoading) {
+    return <div className="section-container py-20 text-center text-slate-500">Loading booking information...</div>
+  }
 
   if (!hotel) {
     return <Navigate replace to="/hotels" />

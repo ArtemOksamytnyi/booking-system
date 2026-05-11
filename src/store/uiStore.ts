@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { hotels } from '../data/hotels'
-import type { Hotel, HotelCategory } from '../data/hotels'
+import type { Hotel, PropertyCategory } from '../types/hotel'
 
 export type AuthModalMode = 'login' | 'register'
 export type UserDashboardTab = 'dashboard' | 'bookings' | 'refunds' | 'messages' | 'help' | 'settings'
@@ -19,11 +18,20 @@ export type OwnerDashboardTab = 'dashboard' | 'hotels' | 'bookings' | 'messages'
 type HotelFilters = {
   search: string
   isAdvancedOpen: boolean
-  category: 'All' | HotelCategory
+  category: 'All' | PropertyCategory
   city: string
+  checkIn: string
+  checkOut: string
+  guests: number
   maxNightPrice: number
   minRating: number
   sortBy: 'recommended' | 'rating' | 'price-asc' | 'price-desc'
+}
+
+const getDateOffset = (offset: number) => {
+  const date = new Date()
+  date.setDate(date.getDate() + offset)
+  return date.toISOString().split('T')[0]
 }
 
 type UiState = {
@@ -36,6 +44,7 @@ type UiState = {
   adminSearch: string
   ownerDashboardTab: OwnerDashboardTab
   ownerHotelNameDraft: string
+  ownerHotelLocationDraft: string
   ownedHotels: Hotel[]
   openAuthModal: (mode: AuthModalMode) => void
   closeAuthModal: () => void
@@ -49,6 +58,7 @@ type UiState = {
   setAdminSearch: (value: string) => void
   setOwnerDashboardTab: (tab: OwnerDashboardTab) => void
   setOwnerHotelNameDraft: (value: string) => void
+  setOwnerHotelLocationDraft: (value: string) => void
   addOwnedHotel: () => void
   removeOwnedHotel: (slug: string) => void
 }
@@ -58,6 +68,9 @@ const defaultHotelFilters: HotelFilters = {
   isAdvancedOpen: false,
   category: 'All',
   city: 'All',
+  checkIn: getDateOffset(1),
+  checkOut: getDateOffset(3),
+  guests: 2,
   maxNightPrice: 300,
   minRating: 0,
   sortBy: 'recommended',
@@ -75,7 +88,8 @@ export const useUiStore = create<UiState>()(
       adminSearch: '',
       ownerDashboardTab: 'hotels',
       ownerHotelNameDraft: '',
-      ownedHotels: hotels.slice(0, 4),
+      ownerHotelLocationDraft: '',
+      ownedHotels: [],
       openAuthModal: (mode) => {
         set({ authModalMode: mode })
       },
@@ -114,23 +128,38 @@ export const useUiStore = create<UiState>()(
       setOwnerHotelNameDraft: (value) => {
         set({ ownerHotelNameDraft: value })
       },
+      setOwnerHotelLocationDraft: (value) => {
+        set({ ownerHotelLocationDraft: value })
+      },
       addOwnedHotel: () => {
-        const { ownerHotelNameDraft } = get()
-        if (!ownerHotelNameDraft.trim()) {
+        const { ownerHotelNameDraft, ownerHotelLocationDraft } = get()
+        if (!ownerHotelNameDraft.trim() || !ownerHotelLocationDraft.trim()) {
           return
         }
 
-        const sample = hotels[Math.floor(Math.random() * hotels.length)]
         set((state) => ({
           ownedHotels: [
             {
-              ...sample,
-              slug: `${sample.slug}-${Date.now()}`,
+              id: Date.now(),
+              slug: `owner-${Date.now()}`,
               name: ownerHotelNameDraft.trim(),
+              location: ownerHotelLocationDraft.trim(),
+              city: ownerHotelLocationDraft.trim().split(',')[0] ?? ownerHotelLocationDraft.trim(),
+              category: 'hotel',
+              image:
+                'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1400&q=80',
+              gallery: [],
+              pricePerNight: 120,
+              rating: 0,
+              reviews: 0,
+              description: 'Owner-created draft property.',
+              amenities: [],
+              rooms: [],
             },
             ...state.ownedHotels,
           ],
           ownerHotelNameDraft: '',
+          ownerHotelLocationDraft: '',
         }))
       },
       removeOwnedHotel: (slug) => {
@@ -140,7 +169,7 @@ export const useUiStore = create<UiState>()(
       },
     }),
     {
-      name: 'lankastay_ui_store_v1',
+      name: 'lankastay_ui_store_v2',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         hotelFilters: state.hotelFilters,
@@ -149,6 +178,7 @@ export const useUiStore = create<UiState>()(
         adminSearch: state.adminSearch,
         ownerDashboardTab: state.ownerDashboardTab,
         ownerHotelNameDraft: state.ownerHotelNameDraft,
+        ownerHotelLocationDraft: state.ownerHotelLocationDraft,
         ownedHotels: state.ownedHotels,
       }),
     },

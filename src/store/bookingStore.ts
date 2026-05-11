@@ -1,9 +1,15 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { hotels } from '../data/hotels'
 
 export type BookingDraft = {
+  propertyId: number
   hotelSlug: string
+  hotelName: string
+  location: string
+  image: string
+  roomId: number
+  roomName: string
+  roomPricePerNight: number
   checkIn: string
   checkOut: string
   guests: number
@@ -12,7 +18,10 @@ export type BookingDraft = {
 export type BookingRecord = {
   id: string
   userEmail: string
+  propertyId: number
   hotelSlug: string
+  roomId: number
+  roomName: string
   hotelName: string
   location: string
   image: string
@@ -20,6 +29,7 @@ export type BookingRecord = {
   checkOut: string
   guests: number
   days: number
+  roomPricePerNight: number
   total: number
   initialPayment: number
   createdAt: string
@@ -81,26 +91,25 @@ export const useBookingStore = create<BookingState>()(
           return null
         }
 
-        const hotel = hotels.find((item) => item.slug === draft.hotelSlug)
-        if (!hotel) {
-          return null
-        }
-
         const days = daysBetween(draft.checkIn, draft.checkOut)
-        const total = days * hotel.pricePerNight
+        const total = days * draft.roomPricePerNight
         const initialPayment = Math.round(total / 2)
 
         const bookingRecord: BookingRecord = {
           id: `booking_${Date.now()}`,
           userEmail,
-          hotelSlug: hotel.slug,
-          hotelName: hotel.name,
-          location: hotel.location,
-          image: hotel.image,
+          propertyId: draft.propertyId,
+          hotelSlug: draft.hotelSlug,
+          roomId: draft.roomId,
+          roomName: draft.roomName,
+          hotelName: draft.hotelName,
+          location: draft.location,
+          image: draft.image,
           checkIn: draft.checkIn,
           checkOut: draft.checkOut,
           guests: draft.guests,
           days,
+          roomPricePerNight: draft.roomPricePerNight,
           total,
           initialPayment,
           createdAt: new Date().toISOString(),
@@ -117,7 +126,7 @@ export const useBookingStore = create<BookingState>()(
         get().bookings.filter((item) => item.userEmail.toLowerCase() === userEmail.toLowerCase()),
     }),
     {
-      name: 'lankastay_booking_store_v1',
+      name: 'lankastay_booking_store_v2',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         draft: state.draft,

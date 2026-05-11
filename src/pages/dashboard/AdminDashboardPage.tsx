@@ -1,5 +1,7 @@
-import { useMemo } from 'react'
-import { useAuth } from '../../context/AuthContext'
+import { useMemo, useState } from 'react'
+import { useAuth, humanizeRole } from '../../context/AuthContext'
+import { formatDateRange, useBooking } from '../../context/BookingContext'
+import { useAuthStore } from '../../store/authStore'
 import { useUiStore } from '../../store/uiStore'
 import type { AdminDashboardTab } from '../../store/uiStore'
 
@@ -14,54 +16,114 @@ const tabItems: Array<{ id: AdminDashboardTab; label: string }> = [
   { id: 'settings', label: 'Setting' },
 ]
 
-const users = [
-  { name: 'John Wick', email: 'user@lankastay.com', role: 'User' },
-  { name: 'Melisa Stone', email: 'melisa@example.com', role: 'User' },
-  { name: 'Bruno Vela', email: 'bruno@example.com', role: 'User' },
-]
-
-const owners = [
-  { name: 'David Wagner', email: 'david_wagner@example.com', date: '24 Jun, 2023', status: 'Super Admin' },
-  { name: 'Ina Hogan', email: 'owner@lankastay.com', date: '24 Aug, 2023', status: 'Owner' },
-  { name: 'Devin Harmon', email: 'wintheiser_enos@yahoo.com', date: '18 Dec, 2023', status: 'Owner' },
-  { name: 'Lena Page', email: 'camila_ledner@gmail.com', date: '8 Oct, 2023', status: 'Pending' },
-]
-
 function AdminDashboardPage() {
-  const { user } = useAuth()
+  const { user, verificationRequests, reviewVerificationRequest } = useAuth()
+  const accounts = useAuthStore((state) => state.accounts)
+  const { getUserBookings } = useBooking()
   const activeTab = useUiStore((state) => state.adminDashboardTab)
   const setActiveTab = useUiStore((state) => state.setAdminDashboardTab)
   const search = useUiStore((state) => state.adminSearch)
   const setSearch = useUiStore((state) => state.setAdminSearch)
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
+  const [adminComment, setAdminComment] = useState('')
 
+  const bookings = useMemo(() => (user ? getUserBookings(user.email) : []), [user, getUserBookings])
   const filteredUsers = useMemo(
-    () => users.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())),
-    [search],
+    () =>
+      accounts.filter((item) =>
+        [item.name, item.email].some((value) => value.toLowerCase().includes(search.toLowerCase())),
+      ),
+    [accounts, search],
   )
 
-  const filteredOwners = useMemo(
-    () => owners.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())),
-    [search],
+  const ownerAccounts = useMemo(
+    () =>
+      accounts.filter(
+        (item) =>
+          item.role === 'hotel_owner' &&
+          [item.name, item.email].some((value) => value.toLowerCase().includes(search.toLowerCase())),
+      ),
+    [accounts, search],
+  )
+
+  const filteredRequests = useMemo(
+    () =>
+      verificationRequests.filter((item) =>
+        [item.ownerName, item.ownerEmail, item.propertyName].some((value) =>
+          value.toLowerCase().includes(search.toLowerCase()),
+        ),
+      ),
+    [verificationRequests, search],
+  )
+
+  const selectedRequest = filteredRequests.find((item) => item.id === selectedRequestId) ?? null
+
+  const handleReview = (status: 'approved' | 'rejected') => {
+    if (!selectedRequestId) {
+      return
+    }
+
+    reviewVerificationRequest(selectedRequestId, status, adminComment)
+    setSelectedRequestId(null)
+    setAdminComment('')
+  }
+
+  const renderBookingCards = () => (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {bookings.map((booking) => (
+        <article key={booking.id} className="rounded-2xl border border-slate-200 p-3">
+          <div className="relative overflow-hidden rounded-2xl">
+            <img alt={booking.hotelName} className="h-44 w-full object-cover" src={booking.image} />
+            <span className="absolute right-0 top-0 rounded-bl-xl bg-primary px-3 py-2 text-xs font-medium text-white">
+              ${Math.round(booking.total / booking.days)} per night
+            </span>
+          </div>
+          <div className="space-y-1 p-2 text-slate-800">
+            <p className="text-xl font-semibold">{booking.hotelName}</p>
+            <p className="text-sm text-slate-500">{booking.location}</p>
+            <p className="text-base">{formatDateRange(booking.checkIn, booking.checkOut)}</p>
+            <p className="text-base">{booking.days} Days</p>
+            <p className="text-base">Room: {booking.roomName}</p>
+            <p className="text-lg font-semibold text-slate-900">Total Payment ${booking.total}</p>
+          </div>
+        </article>
+      ))}
+      {bookings.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 sm:col-span-2 xl:col-span-3">
+          No personal bookings yet for this admin account.
+        </div>
+      ) : null}
+    </div>
   )
 
   const content = () => {
     if (activeTab === 'dashboard') {
       return (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <article className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-sm text-slate-500">Total Users</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{users.length}</p>
-          </article>
-          <article className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-sm text-slate-500">Hotel Owners</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{owners.length}</p>
-          </article>
-          <article className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-sm text-slate-500">Pending Verifications</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">
-              {owners.filter((item) => item.status === 'Pending').length}
-            </p>
-          </article>
+        <div className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-4">
+            <article className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Total Users</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{accounts.length}</p>
+            </article>
+            <article className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Hotel Owners</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{ownerAccounts.length}</p>
+            </article>
+            <article className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Pending Verifications</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">
+                {verificationRequests.filter((item) => item.status === 'pending').length}
+              </p>
+            </article>
+            <article className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">My Bookings</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{bookings.length}</p>
+            </article>
+          </div>
+          <div>
+            <h3 className="mb-3 text-2xl font-semibold text-slate-900">My travel bookings</h3>
+            {renderBookingCards()}
+          </div>
         </div>
       )
     }
@@ -75,7 +137,9 @@ function AdminDashboardPage() {
                 <p className="font-semibold text-slate-900">{person.name}</p>
                 <p className="text-sm text-slate-500">{person.email}</p>
               </div>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-primary">{person.role}</span>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-primary">
+                {humanizeRole(person.role)}
+              </span>
             </article>
           ))}
         </div>
@@ -84,46 +148,146 @@ function AdminDashboardPage() {
 
     if (activeTab === 'owners') {
       return (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left">
-            <thead>
-              <tr className="bg-slate-100 text-base text-slate-500">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Create Date</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOwners.map((owner) => (
-                <tr key={owner.email} className="border-b border-slate-100 text-base text-slate-700">
-                  <td className="px-4 py-4">
-                    <p className="font-medium text-slate-900">{owner.name}</p>
-                    <p className="text-sm text-slate-500">{owner.email}</p>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        owner.status === 'Pending' ? 'bg-slate-200 text-slate-500' : 'bg-primary text-white'
-                      }`}
-                    >
-                      {owner.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">{owner.date}</td>
-                  <td className="px-4 py-4">Hotel Owner</td>
-                  <td className="px-4 py-4">✎ 🗑</td>
+        <div className="space-y-5">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-left">
+              <thead>
+                <tr className="bg-slate-100 text-base text-slate-500">
+                  <th className="px-4 py-3">Owner</th>
+                  <th className="px-4 py-3">Property</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Created</th>
+                  <th className="px-4 py-3">Documents</th>
+                  <th className="px-4 py-3">Action</th>
                 </tr>
+              </thead>
+              <tbody>
+                {filteredRequests.map((request) => (
+                  <tr key={request.id} className="border-b border-slate-100 text-base text-slate-700">
+                    <td className="px-4 py-4">
+                      <p className="font-medium text-slate-900">{request.ownerName}</p>
+                      <p className="text-sm text-slate-500">{request.ownerEmail}</p>
+                    </td>
+                    <td className="px-4 py-4">{request.propertyName}</td>
+                    <td className="px-4 py-4">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          request.status === 'pending'
+                            ? 'bg-slate-200 text-slate-600'
+                            : request.status === 'approved'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        {request.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      {new Date(request.createdAt).toLocaleDateString('en-GB')}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-slate-500">
+                      {request.documents.join(', ')}
+                    </td>
+                    <td className="px-4 py-4">
+                      <button
+                        className="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary"
+                        onClick={() => {
+                          setSelectedRequestId(request.id)
+                          setAdminComment(request.adminComment)
+                        }}
+                        type="button"
+                      >
+                        Review
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {selectedRequest ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-semibold text-slate-900">
+                    {selectedRequest.ownerName} · {selectedRequest.propertyName}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Owner note: {selectedRequest.ownerComment || 'No comment provided.'}
+                  </p>
+                </div>
+                <button
+                  className="text-sm font-semibold text-slate-500"
+                  onClick={() => {
+                    setSelectedRequestId(null)
+                    setAdminComment('')
+                  }}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-white p-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-900">Documents</p>
+                <p className="mt-2">{selectedRequest.documents.join(', ')}</p>
+              </div>
+
+              <label className="mt-4 grid gap-2">
+                <span className="text-sm font-medium text-slate-700">Admin comment</span>
+                <textarea
+                  className="h-28 rounded-xl border border-slate-200 p-3 outline-none transition focus:border-primary"
+                  onChange={(event) => setAdminComment(event.target.value)}
+                  placeholder="Add your verification note..."
+                  value={adminComment}
+                />
+              </label>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => handleReview('approved')}
+                  type="button"
+                >
+                  Approve
+                </button>
+                <button
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => handleReview('rejected')}
+                  type="button"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <h3 className="mb-3 text-xl font-semibold text-slate-900">Owner accounts</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              {ownerAccounts.map((owner) => (
+                <article key={owner.id} className="rounded-xl bg-slate-50 p-4">
+                  <p className="font-semibold text-slate-900">{owner.name}</p>
+                  <p className="text-sm text-slate-500">{owner.email}</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Verification: {owner.verificationStatus}
+                  </p>
+                </article>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
       )
     }
 
     if (activeTab === 'bookings') {
-      return <p className="text-slate-600">Booking monitoring panel: bookings, payment status, and check-in progress.</p>
+      return (
+        <div className="space-y-4">
+          <p className="text-slate-600">Your personal bookings as an admin account are listed below.</p>
+          {renderBookingCards()}
+        </div>
+      )
     }
 
     if (activeTab === 'refunds') {
@@ -178,18 +342,15 @@ function AdminDashboardPage() {
               <input
                 className="h-11 flex-1 rounded-xl bg-slate-100 px-4 text-base outline-none"
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search"
+                placeholder="Search owners, users or properties"
                 value={search}
               />
-              {activeTab === 'owners' ? (
-                <button className="h-11 rounded-xl bg-primary px-5 text-base font-semibold text-white">
-                  Add Owner +
-                </button>
-              ) : null}
             </div>
 
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-4xl font-semibold text-slate-900">{tabItems.find((t) => t.id === activeTab)?.label}</h2>
+              <h2 className="text-4xl font-semibold text-slate-900">
+                {tabItems.find((t) => t.id === activeTab)?.label}
+              </h2>
             </div>
 
             {content()}
