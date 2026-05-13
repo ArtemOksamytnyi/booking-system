@@ -1,8 +1,21 @@
 import { Router } from 'express'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../../middleware/auth'
 import { asyncHandler } from '../../utils/async-handler'
-import { createPropertySchema, listPropertiesSchema, propertyAvailabilitySchema } from './property.schemas'
-import { createProperty, getAvailableRooms, getPropertyById, listProperties } from './property.service'
+import {
+  createOwnerPropertySchema,
+  createPropertySchema,
+  listPropertiesSchema,
+  propertyAvailabilitySchema,
+  reviewPropertyVerificationSchema,
+} from './property.schemas'
+import {
+  createProperty,
+  createPropertyForOwner,
+  getAvailableRooms,
+  getPropertyById,
+  listProperties,
+  reviewPropertyVerification,
+} from './property.service'
 
 const propertyRouter = Router()
 
@@ -16,9 +29,32 @@ propertyRouter.get(
       checkIn: req.query.checkIn,
       checkOut: req.query.checkOut,
       guests: req.query.guests,
+      ownerEmail: req.query.ownerEmail,
     })
     const properties = await listProperties(filters)
     res.json(properties)
+  }),
+)
+
+propertyRouter.post(
+  '/owner',
+  requireAuth,
+  requireRole(['hotel_owner', 'admin']),
+  asyncHandler(async (req, res) => {
+    const input = createOwnerPropertySchema.parse(req.body)
+    const property = await createPropertyForOwner((req as AuthenticatedRequest).user!.userId, input)
+    res.status(201).json(property)
+  }),
+)
+
+propertyRouter.patch(
+  '/verification-status',
+  requireAuth,
+  requireRole(['admin']),
+  asyncHandler(async (req, res) => {
+    const input = reviewPropertyVerificationSchema.parse(req.body)
+    const property = await reviewPropertyVerification(input)
+    res.json(property)
   }),
 )
 

@@ -1,5 +1,15 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { createOwnerProperty } from '../api/properties'
+import { submitVerificationRequestToApi } from '../api/verification'
+import { ApiError } from '../api/client'
+import {
+  loginRequest,
+  meRequest,
+  registerRequest,
+  updateProfileRequest,
+  type AuthUserDto,
+} from '../api/auth'
 
 export type AuthRole = 'user' | 'hotel_owner' | 'admin'
 
@@ -7,22 +17,13 @@ export type VerificationStatus = 'verified' | 'pending' | 'rejected'
 
 export type VerificationRequestStatus = 'pending' | 'approved' | 'rejected'
 
-type StoredAccount = {
-  id: string
-  name: string
-  email: string
-  password: string
-  role: AuthRole
-  documents: string[]
-  verificationStatus: VerificationStatus
-}
-
 export type VerificationRequest = {
   id: string
   ownerId: string
   ownerName: string
   ownerEmail: string
   propertyName: string
+  propertyId?: number
   documents: string[]
   status: VerificationRequestStatus
   ownerComment: string
@@ -31,7 +32,7 @@ export type VerificationRequest = {
   reviewedAt: string | null
 }
 
-export type AuthUser = Omit<StoredAccount, 'password'>
+export type AuthUser = AuthUserDto
 
 export type AuthResult = {
   ok: boolean
@@ -43,118 +44,30 @@ export type RegisterPayload = {
   email: string
   password: string
   role: AuthRole
+  phone: string
+  age?: number
   documents?: string[]
   propertyName?: string
+  propertyTypeName?: 'hotel' | 'villa' | 'apartment' | 'resort'
+  propertyAddress?: string
+  propertyDescription?: string
+  propertyPhotoUrl?: string
+  ownerComment?: string
 }
 
 type AuthState = {
-  accounts: StoredAccount[]
-  verificationRequests: VerificationRequest[]
+  token: string | null
   user: AuthUser | null
-  login: (email: string, password: string) => AuthResult
-  register: (payload: RegisterPayload) => AuthResult
+  isHydrating: boolean
+  login: (email: string, password: string) => Promise<AuthResult>
+  register: (payload: RegisterPayload) => Promise<AuthResult>
   logout: () => void
-  updateProfile: (name: string, email: string) => AuthResult
-  submitVerificationRequest: (payload: {
-    ownerId: string
-    ownerName: string
-    ownerEmail: string
-    propertyName: string
-    documents: string[]
-    ownerComment: string
-  }) => AuthResult
-  reviewVerificationRequest: (
-    requestId: string,
-    status: VerificationRequestStatus,
-    adminComment: string,
-  ) => AuthResult
+  updateProfile: (name: string, email: string) => Promise<AuthResult>
+  hydrateUser: () => Promise<void>
 }
 
-const seedAccounts: StoredAccount[] = [
-  {
-    id: 'acc_admin_1',
-    name: 'Salman Faris',
-    email: 'admin@lankastay.com',
-    password: 'password123',
-    role: 'admin',
-    documents: [],
-    verificationStatus: 'verified',
-  },
-  {
-    id: 'acc_user_1',
-    name: 'John Wick',
-    email: 'user@lankastay.com',
-    password: 'password123',
-    role: 'user',
-    documents: [],
-    verificationStatus: 'verified',
-  },
-  {
-    id: 'acc_owner_1',
-    name: 'Ina Hogan',
-    email: 'ina.owner@lankastay.com',
-    password: 'password123',
-    role: 'hotel_owner',
-    documents: ['business-license.pdf', 'property-proof.pdf'],
-    verificationStatus: 'verified',
-  },
-  {
-    id: 'acc_owner_2',
-    name: 'Devin Harmon',
-    email: 'devin.owner@lankastay.com',
-    password: 'password123',
-    role: 'hotel_owner',
-    documents: ['devin-id.pdf', 'devin-property.pdf'],
-    verificationStatus: 'pending',
-  },
-  {
-    id: 'acc_owner_3',
-    name: 'Lena Page',
-    email: 'lena.owner@lankastay.com',
-    password: 'password123',
-    role: 'hotel_owner',
-    documents: ['lena-id.pdf', 'lena-property.pdf'],
-    verificationStatus: 'pending',
-  },
-]
-
-const seedVerificationRequests: VerificationRequest[] = [
-  {
-    id: 'verify_req_1',
-    ownerId: 'acc_owner_2',
-    ownerName: 'Devin Harmon',
-    ownerEmail: 'devin.owner@lankastay.com',
-    propertyName: 'City Nest Kotte',
-    documents: ['devin-id.pdf', 'devin-property.pdf'],
-    status: 'pending',
-    ownerComment: 'Please verify my ownership documents for City Nest Kotte.',
-    adminComment: '',
-    createdAt: new Date('2026-05-01T10:00:00.000Z').toISOString(),
-    reviewedAt: null,
-  },
-  {
-    id: 'verify_req_2',
-    ownerId: 'acc_owner_3',
-    ownerName: 'Lena Page',
-    ownerEmail: 'lena.owner@lankastay.com',
-    propertyName: 'Ocean Land Trincomalee',
-    documents: ['lena-id.pdf', 'lena-property.pdf'],
-    status: 'pending',
-    ownerComment: 'Submitting updated documents for my hotel verification.',
-    adminComment: '',
-    createdAt: new Date('2026-05-03T14:20:00.000Z').toISOString(),
-    reviewedAt: null,
-  },
-]
-
-const toUser = (account: StoredAccount): AuthUser => ({
-  id: account.id,
-  name: account.name,
-  email: account.email,
-  role: account.role,
-  documents: account.documents,
-  verificationStatus: account.verificationStatus,
-})
+const toMessage = (error: unknown, fallback: string) =>
+  error instanceof ApiError ? error.message : fallback
 
 export const getDashboardPath = (role: AuthRole) => {
   if (role === 'admin') {
@@ -179,200 +92,107 @@ export const humanizeRole = (role: AuthRole) => {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      accounts: seedAccounts,
-      verificationRequests: seedVerificationRequests,
+      token: null,
       user: null,
-      login: (email, password) => {
-        const account = get().accounts.find(
-          (item) => item.email.toLowerCase() === email.toLowerCase().trim() && item.password === password,
-        )
-
-        if (!account) {
-          return { ok: false, message: 'Invalid email or password.' }
+      isHydrating: false,
+      login: async (email, password) => {
+        try {
+          const payload = await loginRequest(email.toLowerCase().trim(), password)
+          set({ token: payload.token, user: payload.user })
+          return { ok: true, message: `Login successful. Welcome back, ${payload.user.name}!` }
+        } catch (error) {
+          return { ok: false, message: toMessage(error, 'Invalid email or password.') }
         }
-
-        const authUser = toUser(account)
-        set({ user: authUser })
-        return { ok: true, message: `Login successful. Welcome back, ${authUser.name}!` }
       },
-      register: ({ name, email, password, role, documents = [], propertyName = 'Owner Property' }) => {
-        const normalizedEmail = email.toLowerCase().trim()
-        const { accounts } = get()
-
-        if (accounts.some((item) => item.email.toLowerCase() === normalizedEmail)) {
-          return { ok: false, message: 'An account with this email already exists.' }
-        }
-
-        if (role === 'hotel_owner' && documents.length < 2) {
-          return { ok: false, message: 'Hotel owner registration requires identity and property documents.' }
-        }
-
-        const newAccount: StoredAccount = {
-          id: `acc_${Date.now()}`,
-          name: name.trim(),
-          email: normalizedEmail,
-          password,
-          role,
-          documents,
-          verificationStatus: role === 'hotel_owner' ? 'pending' : 'verified',
-        }
-
-        const authUser = toUser(newAccount)
-        set((state) => {
-          const nextState: Pick<AuthState, 'accounts' | 'user' | 'verificationRequests'> = {
-            accounts: [...state.accounts, newAccount],
-            user: authUser,
-            verificationRequests: state.verificationRequests,
-          }
+      register: async ({
+        name,
+        email,
+        password,
+        role,
+        phone,
+        age,
+        propertyName,
+        propertyTypeName,
+        propertyAddress,
+        propertyDescription,
+        propertyPhotoUrl,
+        ownerComment,
+      }) => {
+        try {
+          const payload = await registerRequest({
+            name,
+            email: email.toLowerCase().trim(),
+            password,
+            role,
+            phone,
+            age,
+          })
+          set({ token: payload.token, user: payload.user })
 
           if (role === 'hotel_owner') {
-            nextState.verificationRequests = [
-              {
-                id: `verify_req_${Date.now()}`,
-                ownerId: newAccount.id,
-                ownerName: newAccount.name,
-                ownerEmail: newAccount.email,
-                propertyName,
-                documents,
-                status: 'pending',
-                ownerComment: 'Verification request created during registration.',
-                adminComment: '',
-                createdAt: new Date().toISOString(),
-                reviewedAt: null,
-              },
-              ...state.verificationRequests,
-            ]
+            if (!propertyName?.trim() || !propertyAddress?.trim()) {
+              return {
+                ok: false,
+                message: 'Hotel owner registration requires hotel name and address.',
+              }
+            }
+
+            const property = await createOwnerProperty({
+              name: propertyName.trim(),
+              address: propertyAddress.trim(),
+              description: propertyDescription?.trim() || undefined,
+              photoUrl: propertyPhotoUrl?.trim() || undefined,
+              propertyTypeName: propertyTypeName ?? 'hotel',
+            })
+
+            await submitVerificationRequestToApi({
+              propertyId: property.id,
+              comment: ownerComment?.trim() || undefined,
+            })
+
+            return {
+              ok: true,
+              message: 'Registration successful. Your hotel was added and sent for verification.',
+            }
           }
 
-          return nextState
-        })
-
-        if (role === 'hotel_owner') {
-          return {
-            ok: true,
-            message: `Registration successful. ${authUser.name}, your owner account is pending verification.`,
-          }
+          return { ok: true, message: `Registration successful. Welcome, ${payload.user.name}!` }
+        } catch (error) {
+          return { ok: false, message: toMessage(error, 'Unable to register account.') }
         }
-
-        return { ok: true, message: `Registration successful. Welcome, ${authUser.name}!` }
       },
       logout: () => {
-        set({ user: null })
+        set({ token: null, user: null, isHydrating: false })
       },
-      updateProfile: (name, email) => {
-        const { accounts, user } = get()
-
-        if (!user) {
-          return { ok: false, message: 'You are not authorized.' }
+      updateProfile: async (name, email) => {
+        try {
+          const payload = await updateProfileRequest({ name, email: email.toLowerCase().trim() })
+          set({ token: payload.token, user: payload.user })
+          return { ok: true, message: 'Profile updated successfully.' }
+        } catch (error) {
+          return { ok: false, message: toMessage(error, 'Unable to update profile.') }
         }
-
-        const normalizedEmail = email.toLowerCase().trim()
-        const emailUsed = accounts.some(
-          (item) => item.id !== user.id && item.email.toLowerCase() === normalizedEmail,
-        )
-
-        if (emailUsed) {
-          return { ok: false, message: 'Email is already used by another account.' }
-        }
-
-        let updatedUser: AuthUser | null = null
-
-        const nextAccounts = accounts.map((item) => {
-          if (item.id !== user.id) {
-            return item
-          }
-
-          const nextAccount = { ...item, name: name.trim(), email: normalizedEmail }
-          updatedUser = toUser(nextAccount)
-          return nextAccount
-        })
-
-        if (!updatedUser) {
-          return { ok: false, message: 'Unable to update profile.' }
-        }
-
-        set({
-          accounts: nextAccounts,
-          user: updatedUser,
-        })
-
-        return { ok: true, message: 'Profile updated successfully.' }
       },
-      submitVerificationRequest: ({ ownerId, ownerName, ownerEmail, propertyName, documents, ownerComment }) => {
-        if (!propertyName.trim()) {
-          return { ok: false, message: 'Property name is required for verification.' }
+      hydrateUser: async () => {
+        if (!get().token) {
+          return
         }
 
-        set((state) => ({
-          verificationRequests: [
-            {
-              id: `verify_req_${Date.now()}`,
-              ownerId,
-              ownerName,
-              ownerEmail,
-              propertyName: propertyName.trim(),
-              documents,
-              status: 'pending',
-              ownerComment: ownerComment.trim(),
-              adminComment: '',
-              createdAt: new Date().toISOString(),
-              reviewedAt: null,
-            },
-            ...state.verificationRequests,
-          ],
-          accounts: state.accounts.map((account) =>
-            account.id === ownerId ? { ...account, verificationStatus: 'pending' } : account,
-          ),
-          user:
-            state.user?.id === ownerId ? { ...state.user, verificationStatus: 'pending' } : state.user,
-        }))
+        set({ isHydrating: true })
 
-        return { ok: true, message: 'Verification request submitted to admin.' }
-      },
-      reviewVerificationRequest: (requestId, status, adminComment) => {
-        const request = get().verificationRequests.find((item) => item.id === requestId)
-        if (!request) {
-          return { ok: false, message: 'Verification request not found.' }
-        }
-
-        const verificationStatus: VerificationStatus =
-          status === 'approved' ? 'verified' : 'rejected'
-
-        set((state) => ({
-          verificationRequests: state.verificationRequests.map((item) =>
-            item.id === requestId
-              ? {
-                  ...item,
-                  status,
-                  adminComment: adminComment.trim(),
-                  reviewedAt: new Date().toISOString(),
-                }
-              : item,
-          ),
-          accounts: state.accounts.map((account) =>
-            account.id === request.ownerId ? { ...account, verificationStatus } : account,
-          ),
-          user:
-            state.user?.id === request.ownerId
-              ? { ...state.user, verificationStatus }
-              : state.user,
-        }))
-
-        return {
-          ok: true,
-          message:
-            status === 'approved'
-              ? 'Verification request approved.'
-              : 'Verification request rejected.',
+        try {
+          const user = await meRequest()
+          set({ user, isHydrating: false })
+        } catch {
+          set({ token: null, user: null, isHydrating: false })
         }
       },
     }),
     {
-      name: 'lankastay_auth_store_v1',
+      name: 'lankastay_auth_store_v3',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        accounts: state.accounts,
-        verificationRequests: state.verificationRequests,
+        token: state.token,
         user: state.user,
       }),
     },

@@ -1,58 +1,39 @@
-import {
-  getDashboardPath,
-  humanizeRole,
-  useAuthStore,
-} from '../store/authStore'
+import { getDashboardPath, humanizeRole, useAuthStore } from '../store/authStore'
 import type {
   AuthResult,
   AuthRole,
   AuthUser,
   RegisterPayload,
-  VerificationRequest,
   VerificationStatus,
 } from '../store/authStore'
 
 type AuthContextValue = {
   user: AuthUser | null
-  login: (email: string, password: string) => AuthResult
-  register: (payload: RegisterPayload) => AuthResult
+  isHydrating: boolean
+  login: (email: string, password: string) => Promise<AuthResult>
+  register: (payload: RegisterPayload) => Promise<AuthResult>
   logout: () => void
-  updateProfile: (name: string, email: string) => AuthResult
-  verificationRequests: VerificationRequest[]
-  submitVerificationRequest: (payload: {
-    ownerId: string
-    ownerName: string
-    ownerEmail: string
-    propertyName: string
-    documents: string[]
-    ownerComment: string
-  }) => AuthResult
-  reviewVerificationRequest: (
-    requestId: string,
-    status: 'pending' | 'approved' | 'rejected',
-    adminComment: string,
-  ) => AuthResult
+  updateProfile: (name: string, email: string) => Promise<AuthResult>
+  hydrateUser: () => Promise<void>
 }
 
 export const useAuth = (): AuthContextValue => {
   const user = useAuthStore((state) => state.user)
+  const isHydrating = useAuthStore((state) => state.isHydrating)
   const login = useAuthStore((state) => state.login)
   const register = useAuthStore((state) => state.register)
   const logout = useAuthStore((state) => state.logout)
   const updateProfile = useAuthStore((state) => state.updateProfile)
-  const verificationRequests = useAuthStore((state) => state.verificationRequests)
-  const submitVerificationRequest = useAuthStore((state) => state.submitVerificationRequest)
-  const reviewVerificationRequest = useAuthStore((state) => state.reviewVerificationRequest)
+  const hydrateUser = useAuthStore((state) => state.hydrateUser)
 
   return {
     user,
+    isHydrating,
     login,
     register,
     logout,
     updateProfile,
-    verificationRequests,
-    submitVerificationRequest,
-    reviewVerificationRequest,
+    hydrateUser,
   }
 }
 
@@ -62,6 +43,5 @@ export type {
   AuthRole,
   AuthUser,
   RegisterPayload,
-  VerificationRequest,
   VerificationStatus,
 }

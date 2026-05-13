@@ -1,4 +1,4 @@
-import { PaymentMethod, PaymentStatus } from '@prisma/client'
+import { BookingStatus, PaymentMethod, PaymentStatus } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { HttpError } from '../../utils/http'
 
@@ -37,6 +37,10 @@ export const createPayment = async (input: {
     where: { id: booking.id },
     data: {
       paymentStatus,
+      bookingStatus:
+        paymentStatus === PaymentStatus.PAID || paymentStatus === PaymentStatus.PARTIALLY_PAID
+          ? BookingStatus.CONFIRMED
+          : booking.bookingStatus,
     },
   })
 

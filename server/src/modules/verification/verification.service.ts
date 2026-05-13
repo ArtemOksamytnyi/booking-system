@@ -28,6 +28,35 @@ export const listVerificationRequests = async () =>
     },
   })
 
+export const listOwnerVerificationRequests = async (ownerId: number) =>
+  prisma.verificationRequest.findMany({
+    where: {
+      ownerId,
+    },
+    include: {
+      owner: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+      property: true,
+      admin: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: {
+      requestDate: 'desc',
+    },
+  })
+
 export const createVerificationRequest = async (ownerId: number, input: {
   propertyId: number
   comment?: string

@@ -1,6 +1,13 @@
 import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getMyBookings, getOwnerBookings } from '../../api/bookings'
+import { createOwnerProperty, getOwnerProperties } from '../../api/properties'
+import {
+  getVerificationRequests,
+  submitVerificationRequestToApi,
+} from '../../api/verification'
 import { useAuth } from '../../context/AuthContext'
-import { formatDateRange, useBooking } from '../../context/BookingContext'
+import { formatDateRange } from '../../context/BookingContext'
 import { useUiStore } from '../../store/uiStore'
 import type { OwnerDashboardTab } from '../../store/uiStore'
 
@@ -13,25 +20,68 @@ const tabItems: Array<{ id: OwnerDashboardTab; label: string }> = [
 ]
 
 function OwnerDashboardPage() {
-  const { user, verificationRequests, submitVerificationRequest } = useAuth()
-  const { getUserBookings } = useBooking()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
   const activeTab = useUiStore((state) => state.ownerDashboardTab)
   const setActiveTab = useUiStore((state) => state.setOwnerDashboardTab)
-  const hotelName = useUiStore((state) => state.ownerHotelNameDraft)
-  const setHotelName = useUiStore((state) => state.setOwnerHotelNameDraft)
-  const hotelLocation = useUiStore((state) => state.ownerHotelLocationDraft)
-  const setHotelLocation = useUiStore((state) => state.setOwnerHotelLocationDraft)
-  const ownedHotels = useUiStore((state) => state.ownedHotels)
-  const addHotel = useUiStore((state) => state.addOwnedHotel)
-  const removeHotel = useUiStore((state) => state.removeOwnedHotel)
+  const [hotelName, setHotelName] = useState('')
+  const [hotelLocation, setHotelLocation] = useState('')
+  const [hotelType, setHotelType] = useState<'hotel' | 'villa' | 'apartment' | 'resort'>('hotel')
+  const [hotelDescription, setHotelDescription] = useState('')
+  const [hotelPhotoUrl, setHotelPhotoUrl] = useState('')
   const [verificationComment, setVerificationComment] = useState('')
 
-  const bookings = useMemo(() => (user ? getUserBookings(user.email) : []), [user, getUserBookings])
-  const ownerRequests = useMemo(
-    () =>
-      verificationRequests.filter((request) => request.ownerEmail === user?.email),
-    [verificationRequests, user],
-  )
+  const { data: ownedHotels = [], isLoading: isLoadingHotels } = useQuery({
+    enabled: Boolean(user?.email),
+    queryKey: ['owner-properties', user?.email],
+    queryFn: () => getOwnerProperties(user!.email),
+  })
+
+  const { data: personalBookings = [] } = useQuery({
+    enabled: Boolean(user),
+    queryKey: ['dashboard-bookings', 'me'],
+    queryFn: getMyBookings,
+  })
+
+  const { data: hotelBookings = [] } = useQuery({
+    enabled: Boolean(user?.role === 'hotel_owner'),
+    queryKey: ['dashboard-bookings', 'owner'],
+    queryFn: getOwnerBookings,
+  })
+
+  const { data: ownerRequests = [] } = useQuery({
+    enabled: Boolean(user?.role === 'hotel_owner'),
+    queryKey: ['verification-requests', 'owner'],
+    queryFn: getVerificationRequests,
+  })
+
+  const createHotelMutation = useMutation({
+    mutationFn: () =>
+      createOwnerProperty({
+        name: hotelName.trim(),
+        address: hotelLocation.trim(),
+        description: hotelDescription.trim() || undefined,
+        photoUrl: hotelPhotoUrl.trim() || undefined,
+        propertyTypeName: hotelType,
+      }),
+    onSuccess: async (property) => {
+      await submitVerificationRequestToApi({
+        propertyId: property.id,
+        comment: verificationComment.trim() || undefined,
+      })
+      setHotelName('')
+      setHotelLocation('')
+      setHotelType('hotel')
+      setHotelDescription('')
+      setHotelPhotoUrl('')
+      setVerificationComment('')
+      queryClient.invalidateQueries({ queryKey: ['owner-properties', user?.email] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
+      queryClient.invalidateQueries({ queryKey: ['verification-requests', 'owner'] })
+      queryClient.invalidateQueries({ queryKey: ['verification-requests', 'admin'] })
+    },
+  })
+
   const avgRating = useMemo(
     () =>
       ownedHotels.length
@@ -40,23 +90,19 @@ function OwnerDashboardPage() {
     [ownedHotels],
   )
 
-  const submitRequest = (propertyName: string) => {
-    if (!user) {
+  const addHotel = () => {
+    if (!hotelName.trim() || !hotelLocation.trim() || !user) {
       return
     }
 
-    submitVerificationRequest({
-      ownerId: user.id,
-      ownerName: user.name,
-      ownerEmail: user.email,
-      propertyName,
-      documents: user.documents,
-      ownerComment: verificationComment,
-    })
-    setVerificationComment('')
+    createHotelMutation.mutate()
   }
 
-  const renderBookingCards = () => (
+  const renderBookingCards = (
+    bookings: typeof personalBookings,
+    emptyLabel: string,
+    showRenter = false,
+  ) => (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {bookings.map((booking) => (
         <article key={booking.id} className="rounded-2xl border border-slate-200 p-3">
@@ -72,13 +118,16 @@ function OwnerDashboardPage() {
             <p className="text-base">{formatDateRange(booking.checkIn, booking.checkOut)}</p>
             <p className="text-base">{booking.days} Days</p>
             <p className="text-base">Room: {booking.roomName}</p>
+            {showRenter && booking.renterName ? (
+              <p className="text-base text-slate-600">Guest: {booking.renterName}</p>
+            ) : null}
             <p className="text-lg font-semibold text-slate-900">Total Payment ${booking.total}</p>
           </div>
         </article>
       ))}
       {bookings.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 sm:col-span-2 xl:col-span-3">
-          No travel bookings yet for this owner account.
+          {emptyLabel}
         </div>
       ) : null}
     </div>
@@ -98,23 +147,27 @@ function OwnerDashboardPage() {
               <p className="mt-2 text-3xl font-semibold text-slate-900">{avgRating}</p>
             </article>
             <article className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Verification</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {user?.verificationStatus === 'verified'
-                  ? 'Verified'
-                  : user?.verificationStatus === 'rejected'
-                    ? 'Rejected'
-                    : 'Pending'}
+              <p className="text-sm text-slate-500">Pending Requests</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">
+                {ownerRequests.filter((request) => request.status === 'pending').length}
               </p>
             </article>
             <article className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">My Bookings</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">{bookings.length}</p>
+              <p className="text-sm text-slate-500">Hotel Bookings</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{hotelBookings.length}</p>
             </article>
           </div>
           <div>
             <h3 className="mb-3 text-2xl font-semibold text-slate-900">My travel bookings</h3>
-            {renderBookingCards()}
+            {renderBookingCards(personalBookings, 'No travel bookings yet for this owner account.')}
+          </div>
+          <div>
+            <h3 className="mb-3 text-2xl font-semibold text-slate-900">Bookings in my hotels</h3>
+            {renderBookingCards(
+              hotelBookings,
+              'No guest reservations yet for your hotel portfolio.',
+              true,
+            )}
           </div>
         </div>
       )
@@ -123,7 +176,7 @@ function OwnerDashboardPage() {
     if (activeTab === 'hotels') {
       return (
         <div className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+          <div className="grid gap-3 md:grid-cols-2">
             <input
               className="h-11 rounded-xl border border-slate-200 px-4 text-base"
               onChange={(event) => setHotelName(event.target.value)}
@@ -136,26 +189,52 @@ function OwnerDashboardPage() {
               placeholder="Location, City"
               value={hotelLocation}
             />
+            <select
+              className="h-11 rounded-xl border border-slate-200 px-4 text-base"
+              onChange={(event) =>
+                setHotelType(event.target.value as 'hotel' | 'villa' | 'apartment' | 'resort')
+              }
+              value={hotelType}
+            >
+              <option value="hotel">Hotel</option>
+              <option value="villa">Villa</option>
+              <option value="apartment">Apartment</option>
+              <option value="resort">Resort</option>
+            </select>
+            <input
+              className="h-11 rounded-xl border border-slate-200 px-4 text-base"
+              onChange={(event) => setHotelPhotoUrl(event.target.value)}
+              placeholder="Photo URL"
+              type="url"
+              value={hotelPhotoUrl}
+            />
+            <textarea
+              className="min-h-28 rounded-xl border border-slate-200 px-4 py-3 text-base md:col-span-2"
+              onChange={(event) => setHotelDescription(event.target.value)}
+              placeholder="Hotel description"
+              value={hotelDescription}
+            />
+            <textarea
+              className="min-h-24 rounded-xl border border-slate-200 px-4 py-3 text-base md:col-span-2"
+              onChange={(event) => setVerificationComment(event.target.value)}
+              placeholder="Verification note for admin"
+              value={verificationComment}
+            />
             <button
-              className="h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-white"
+              className="h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-white md:col-span-2"
               onClick={addHotel}
               type="button"
             >
-              Add Hotel
+              {createHotelMutation.isPending ? 'Adding...' : 'Add Hotel and Send to Verification'}
             </button>
           </div>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-700">Verification request comment</span>
-            <textarea
-              className="h-28 rounded-xl border border-slate-200 p-3 outline-none transition focus:border-primary"
-              onChange={(event) => setVerificationComment(event.target.value)}
-              placeholder="Tell admin what documents you uploaded or what changed."
-              value={verificationComment}
-            />
-          </label>
-
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {isLoadingHotels ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 sm:col-span-2 xl:col-span-3">
+                Loading your hotels...
+              </div>
+            ) : null}
             {ownedHotels.map((hotel) => (
               <article key={hotel.slug} className="overflow-hidden rounded-2xl border border-slate-200">
                 <img alt={hotel.name} className="h-40 w-full object-cover" src={hotel.image} />
@@ -166,24 +245,29 @@ function OwnerDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-amber-500">★ {hotel.rating.toFixed(1)}</span>
-                    <button
-                      className="text-sm font-semibold text-rose-600"
-                      onClick={() => removeHotel(hotel.slug)}
-                      type="button"
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        hotel.verificationStatus === 'approved'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : hotel.verificationStatus === 'rejected'
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-slate-200 text-slate-600'
+                      }`}
                     >
-                      Remove
-                    </button>
+                      {hotel.verificationStatus}
+                    </span>
                   </div>
-                  <button
-                    className="w-full rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary"
-                    onClick={() => submitRequest(hotel.name)}
-                    type="button"
-                  >
-                    Send Verification Request
-                  </button>
+                  <p className="text-sm text-slate-500">
+                    Verification is sent automatically when the hotel is created.
+                  </p>
                 </div>
               </article>
             ))}
+            {!isLoadingHotels && ownedHotels.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 sm:col-span-2 xl:col-span-3">
+                You have not added any hotels yet.
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-slate-200 p-4">
@@ -213,9 +297,7 @@ function OwnerDashboardPage() {
                   ) : null}
                 </article>
               ))}
-              {ownerRequests.length === 0 ? (
-                <p className="text-slate-500">No verification requests yet.</p>
-              ) : null}
+              {ownerRequests.length === 0 ? <p className="text-slate-500">No verification requests yet.</p> : null}
             </div>
           </div>
         </div>
@@ -226,7 +308,15 @@ function OwnerDashboardPage() {
       return (
         <div className="space-y-4">
           <p className="text-slate-600">Your own travel bookings are listed below.</p>
-          {renderBookingCards()}
+          {renderBookingCards(personalBookings, 'No travel bookings yet for this owner account.')}
+          <div className="pt-2">
+            <p className="mb-3 text-slate-600">Guest bookings for your hotels.</p>
+            {renderBookingCards(
+              hotelBookings,
+              'No guest reservations yet for your hotel portfolio.',
+              true,
+            )}
+          </div>
         </div>
       )
     }

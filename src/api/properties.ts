@@ -8,6 +8,7 @@ type ApiProperty = {
   description: string | null
   rating: string | number | null
   photoUrl: string | null
+  verificationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED'
   propertyType: {
     name: PropertyCategory
   }
@@ -46,6 +47,11 @@ export type PropertyFilters = {
   checkIn?: string
   checkOut?: string
   guests?: number
+  ownerEmail?: string
+}
+
+export type OwnerProperty = Hotel & {
+  verificationStatus: 'pending' | 'approved' | 'rejected'
 }
 
 const slugify = (value: string) =>
@@ -102,6 +108,11 @@ export const mapPropertyToHotel = (property: ApiProperty): Hotel => {
   }
 }
 
+export const mapPropertyToOwnerHotel = (property: ApiProperty): OwnerProperty => ({
+  ...mapPropertyToHotel(property),
+  verificationStatus: (property.verificationStatus ?? 'PENDING').toLowerCase() as OwnerProperty['verificationStatus'],
+})
+
 export const getHighlightsFromHotels = (hotels: Hotel[]): HighlightCard[] =>
   hotels
     .slice()
@@ -140,6 +151,45 @@ export const getPropertyById = async (id: number) => {
   const property = await apiFetch<ApiProperty>(`/properties/${id}`)
   return mapPropertyToHotel(property)
 }
+
+export const getOwnerProperties = async (ownerEmail: string) => {
+  const properties = await apiFetch<ApiProperty[]>(
+    `/properties${buildQueryString({
+      ownerEmail,
+    })}`,
+  )
+
+  return properties.map(mapPropertyToOwnerHotel)
+}
+
+export const createOwnerProperty = async (payload: {
+  name: string
+  address: string
+  description?: string
+  photoUrl?: string
+  propertyTypeName?: 'hotel' | 'villa' | 'apartment' | 'resort'
+}) => {
+  const property = await apiFetch<ApiProperty>('/properties/owner', {
+    method: 'POST',
+    body: JSON.stringify({
+      propertyTypeName: payload.propertyTypeName ?? 'hotel',
+      ...payload,
+    }),
+  })
+
+  return mapPropertyToOwnerHotel(property)
+}
+
+export const reviewPropertyVerificationStatus = async (payload: {
+  ownerEmail: string
+  propertyName: string
+  propertyId?: number
+  status: 'APPROVED' | 'REJECTED'
+}) =>
+  apiFetch('/properties/verification-status', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
 
 export const getAvailableRooms = async (
   propertyId: number,

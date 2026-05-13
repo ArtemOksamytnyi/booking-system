@@ -43,6 +43,7 @@ type BookingState = {
   updateDraft: (partial: Partial<BookingDraft>) => void
   finalizeBooking: (userEmail: string) => BookingRecord | null
   getUserBookings: (userEmail: string) => BookingRecord[]
+  getAllBookings: () => BookingRecord[]
 }
 
 const parseDate = (date: string) => new Date(`${date}T00:00:00`)
@@ -124,6 +125,7 @@ export const useBookingStore = create<BookingState>()(
       },
       getUserBookings: (userEmail) =>
         get().bookings.filter((item) => item.userEmail.toLowerCase() === userEmail.toLowerCase()),
+      getAllBookings: () => get().bookings,
     }),
     {
       name: 'lankastay_booking_store_v2',

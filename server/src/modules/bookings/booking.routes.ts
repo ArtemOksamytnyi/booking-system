@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { requireAuth, type AuthenticatedRequest } from '../../middleware/auth'
 import { asyncHandler } from '../../utils/async-handler'
 import { createBookingSchema } from './booking.schemas'
-import { createBooking, listUserBookings } from './booking.service'
+import { createBooking, listAllBookings, listOwnerBookings, listUserBookings } from './booking.service'
 
 const bookingRouter = Router()
 
@@ -11,7 +11,16 @@ bookingRouter.use(requireAuth)
 bookingRouter.get(
   '/',
   asyncHandler(async (req, res) => {
-    const bookings = await listUserBookings((req as AuthenticatedRequest).user!.userId)
+    const authUser = (req as AuthenticatedRequest).user!
+    const scope = String(req.query.scope ?? 'me')
+
+    const bookings =
+      scope === 'owner' && authUser.role === 'hotel_owner'
+        ? await listOwnerBookings(authUser.userId)
+        : scope === 'all' && authUser.role === 'admin'
+          ? await listAllBookings()
+          : await listUserBookings(authUser.userId)
+
     res.json(bookings)
   }),
 )

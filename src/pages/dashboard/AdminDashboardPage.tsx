@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getAllBookings, getMyBookings } from '../../api/bookings'
+import { getUsers } from '../../api/users'
+import {
+  getVerificationRequests,
+  reviewVerificationRequestInApi,
+} from '../../api/verification'
 import { useAuth, humanizeRole } from '../../context/AuthContext'
-import { formatDateRange, useBooking } from '../../context/BookingContext'
-import { useAuthStore } from '../../store/authStore'
+import { formatDateRange } from '../../context/BookingContext'
 import { useUiStore } from '../../store/uiStore'
 import type { AdminDashboardTab } from '../../store/uiStore'
 
@@ -17,9 +23,8 @@ const tabItems: Array<{ id: AdminDashboardTab; label: string }> = [
 ]
 
 function AdminDashboardPage() {
-  const { user, verificationRequests, reviewVerificationRequest } = useAuth()
-  const accounts = useAuthStore((state) => state.accounts)
-  const { getUserBookings } = useBooking()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
   const activeTab = useUiStore((state) => state.adminDashboardTab)
   const setActiveTab = useUiStore((state) => state.setAdminDashboardTab)
   const search = useUiStore((state) => state.adminSearch)
@@ -27,23 +32,46 @@ function AdminDashboardPage() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
   const [adminComment, setAdminComment] = useState('')
 
-  const bookings = useMemo(() => (user ? getUserBookings(user.email) : []), [user, getUserBookings])
+  const { data: users = [] } = useQuery({
+    enabled: Boolean(user?.role === 'admin'),
+    queryKey: ['admin-users'],
+    queryFn: getUsers,
+  })
+
+  const { data: verificationRequests = [] } = useQuery({
+    enabled: Boolean(user?.role === 'admin'),
+    queryKey: ['verification-requests', 'admin'],
+    queryFn: getVerificationRequests,
+  })
+
+  const { data: myBookings = [] } = useQuery({
+    enabled: Boolean(user),
+    queryKey: ['dashboard-bookings', 'me'],
+    queryFn: getMyBookings,
+  })
+
+  const { data: allBookings = [] } = useQuery({
+    enabled: Boolean(user?.role === 'admin'),
+    queryKey: ['dashboard-bookings', 'all'],
+    queryFn: getAllBookings,
+  })
+
   const filteredUsers = useMemo(
     () =>
-      accounts.filter((item) =>
+      users.filter((item) =>
         [item.name, item.email].some((value) => value.toLowerCase().includes(search.toLowerCase())),
       ),
-    [accounts, search],
+    [users, search],
   )
 
   const ownerAccounts = useMemo(
     () =>
-      accounts.filter(
+      users.filter(
         (item) =>
           item.role === 'hotel_owner' &&
           [item.name, item.email].some((value) => value.toLowerCase().includes(search.toLowerCase())),
       ),
-    [accounts, search],
+    [users, search],
   )
 
   const filteredRequests = useMemo(
@@ -58,17 +86,37 @@ function AdminDashboardPage() {
 
   const selectedRequest = filteredRequests.find((item) => item.id === selectedRequestId) ?? null
 
-  const handleReview = (status: 'approved' | 'rejected') => {
+  const reviewMutation = useMutation({
+    mutationFn: async (status: 'approved' | 'rejected') => {
+      if (!selectedRequest) {
+        return
+      }
+
+      await reviewVerificationRequestInApi({
+        requestId: selectedRequest.id,
+        status: status === 'approved' ? 'APPROVED' : 'REJECTED',
+        comment: adminComment.trim() || undefined,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['verification-requests', 'admin'] })
+      queryClient.invalidateQueries({ queryKey: ['verification-requests', 'owner'] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-properties'] })
+    },
+  })
+
+  const handleReview = async (status: 'approved' | 'rejected') => {
     if (!selectedRequestId) {
       return
     }
 
-    reviewVerificationRequest(selectedRequestId, status, adminComment)
+    await reviewMutation.mutateAsync(status)
     setSelectedRequestId(null)
     setAdminComment('')
   }
 
-  const renderBookingCards = () => (
+  const renderBookingCards = (bookings: typeof myBookings, emptyLabel: string, showRenter = false) => (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {bookings.map((booking) => (
         <article key={booking.id} className="rounded-2xl border border-slate-200 p-3">
@@ -84,13 +132,16 @@ function AdminDashboardPage() {
             <p className="text-base">{formatDateRange(booking.checkIn, booking.checkOut)}</p>
             <p className="text-base">{booking.days} Days</p>
             <p className="text-base">Room: {booking.roomName}</p>
+            {showRenter && booking.renterName ? (
+              <p className="text-base text-slate-600">Guest: {booking.renterName}</p>
+            ) : null}
             <p className="text-lg font-semibold text-slate-900">Total Payment ${booking.total}</p>
           </div>
         </article>
       ))}
       {bookings.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 sm:col-span-2 xl:col-span-3">
-          No personal bookings yet for this admin account.
+          {emptyLabel}
         </div>
       ) : null}
     </div>
@@ -103,7 +154,7 @@ function AdminDashboardPage() {
           <div className="grid gap-4 sm:grid-cols-4">
             <article className="rounded-2xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Total Users</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">{accounts.length}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{users.length}</p>
             </article>
             <article className="rounded-2xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Hotel Owners</p>
@@ -117,12 +168,12 @@ function AdminDashboardPage() {
             </article>
             <article className="rounded-2xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">My Bookings</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">{bookings.length}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{myBookings.length}</p>
             </article>
           </div>
           <div>
             <h3 className="mb-3 text-2xl font-semibold text-slate-900">My travel bookings</h3>
-            {renderBookingCards()}
+            {renderBookingCards(myBookings, 'No personal bookings yet for this admin account.')}
           </div>
         </div>
       )
@@ -157,7 +208,7 @@ function AdminDashboardPage() {
                   <th className="px-4 py-3">Property</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Created</th>
-                  <th className="px-4 py-3">Documents</th>
+                  <th className="px-4 py-3">Comment</th>
                   <th className="px-4 py-3">Action</th>
                 </tr>
               </thead>
@@ -182,12 +233,8 @@ function AdminDashboardPage() {
                         {request.status}
                       </span>
                     </td>
-                    <td className="px-4 py-4">
-                      {new Date(request.createdAt).toLocaleDateString('en-GB')}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-slate-500">
-                      {request.documents.join(', ')}
-                    </td>
+                    <td className="px-4 py-4">{new Date(request.createdAt).toLocaleDateString('en-GB')}</td>
+                    <td className="px-4 py-4 text-sm text-slate-500">{request.ownerComment || '-'}</td>
                     <td className="px-4 py-4">
                       <button
                         className="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary"
@@ -229,11 +276,6 @@ function AdminDashboardPage() {
                 </button>
               </div>
 
-              <div className="mt-4 rounded-xl bg-white p-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-900">Documents</p>
-                <p className="mt-2">{selectedRequest.documents.join(', ')}</p>
-              </div>
-
               <label className="mt-4 grid gap-2">
                 <span className="text-sm font-medium text-slate-700">Admin comment</span>
                 <textarea
@@ -247,14 +289,14 @@ function AdminDashboardPage() {
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
-                  onClick={() => handleReview('approved')}
+                  onClick={() => void handleReview('approved')}
                   type="button"
                 >
                   Approve
                 </button>
                 <button
                   className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
-                  onClick={() => handleReview('rejected')}
+                  onClick={() => void handleReview('rejected')}
                   type="button"
                 >
                   Reject
@@ -270,9 +312,7 @@ function AdminDashboardPage() {
                 <article key={owner.id} className="rounded-xl bg-slate-50 p-4">
                   <p className="font-semibold text-slate-900">{owner.name}</p>
                   <p className="text-sm text-slate-500">{owner.email}</p>
-                  <p className="mt-2 text-sm text-slate-600">
-                    Verification: {owner.verificationStatus}
-                  </p>
+                  <p className="mt-2 text-sm text-slate-600">Role: {humanizeRole(owner.role)}</p>
                 </article>
               ))}
             </div>
@@ -284,8 +324,8 @@ function AdminDashboardPage() {
     if (activeTab === 'bookings') {
       return (
         <div className="space-y-4">
-          <p className="text-slate-600">Your personal bookings as an admin account are listed below.</p>
-          {renderBookingCards()}
+          <p className="text-slate-600">All bookings from the database are listed below.</p>
+          {renderBookingCards(allBookings, 'No bookings in the system yet.', true)}
         </div>
       )
     }

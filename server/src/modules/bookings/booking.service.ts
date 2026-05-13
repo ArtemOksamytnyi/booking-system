@@ -80,3 +80,50 @@ export const listUserBookings = async (userId: number) =>
       createdAt: 'desc',
     },
   })
+
+export const listOwnerBookings = async (ownerId: number) =>
+  prisma.booking.findMany({
+    where: {
+      room: {
+        property: {
+          ownerId,
+        },
+      },
+    },
+    include: {
+      room: {
+        include: {
+          property: true,
+        },
+      },
+      renter: {
+        include: {
+          role: true,
+        },
+      },
+      payments: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  })
+
+export const listAllBookings = async () =>
+  prisma.booking.findMany({
+    include: {
+      room: {
+        include: {
+          property: true,
+        },
+      },
+      renter: {
+        include: {
+          role: true,
+        },
+      },
+      payments: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  })

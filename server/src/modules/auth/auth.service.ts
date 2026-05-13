@@ -127,3 +127,52 @@ export const getCurrentUser = async (userId: number) => {
     createdAt: user.createdAt,
   }
 }
+
+export const updateCurrentUser = async (
+  userId: number,
+  input: {
+    firstName: string
+    lastName: string
+    email: string
+  },
+) => {
+  const emailOwner = await prisma.user.findUnique({
+    where: { email: input.email },
+  })
+
+  if (emailOwner && emailOwner.id !== userId) {
+    throw new HttpError(409, 'User with this email already exists')
+  }
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      firstName: input.firstName,
+      lastName: input.lastName,
+      email: input.email,
+    },
+    include: {
+      role: true,
+    },
+  })
+
+  const token = signToken({
+    userId: user.id,
+    role: user.role.name as JwtPayload['role'],
+    email: user.email,
+  })
+
+  return {
+    token,
+    user: {
+      id: user.id,
+      role: user.role.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      email: user.email,
+      age: user.age,
+      createdAt: user.createdAt,
+    },
+  }
+}

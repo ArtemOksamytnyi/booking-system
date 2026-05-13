@@ -42,7 +42,15 @@ function HotelsPage() {
     queryFn: () => getProperties(queryFilters),
   })
 
-  const cities = useMemo(() => ['All', ...new Set(hotels.map((hotel) => hotel.city))], [hotels])
+  const { data: locationHotels = [] } = useQuery({
+    queryKey: ['properties', 'locations'],
+    queryFn: () => getProperties(),
+  })
+
+  const cities = useMemo(
+    () => ['All', ...new Set(locationHotels.map((hotel) => hotel.city))],
+    [locationHotels],
+  )
 
   const filteredHotels = useMemo(() => {
     return hotels

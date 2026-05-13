@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { getMyBookings } from '../../api/bookings'
 import { useAuth } from '../../context/AuthContext'
-import { formatDateRange, useBooking } from '../../context/BookingContext'
+import { formatDateRange } from '../../context/BookingContext'
 import { useUiStore } from '../../store/uiStore'
 import type { UserDashboardTab } from '../../store/uiStore'
 
@@ -15,11 +16,14 @@ const tabItems: Array<{ id: UserDashboardTab; label: string }> = [
 
 function UserDashboardPage() {
   const { user } = useAuth()
-  const { getUserBookings } = useBooking()
   const activeTab = useUiStore((state) => state.userDashboardTab)
   const setActiveTab = useUiStore((state) => state.setUserDashboardTab)
 
-  const bookings = useMemo(() => (user ? getUserBookings(user.email) : []), [user, getUserBookings])
+  const { data: bookings = [] } = useQuery({
+    enabled: Boolean(user),
+    queryKey: ['dashboard-bookings', 'me'],
+    queryFn: getMyBookings,
+  })
 
   const content = () => {
     if (activeTab === 'dashboard') {

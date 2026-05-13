@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import AuthModal from '../components/AuthModal'
 import SuccessModal from '../components/SuccessModal'
@@ -13,7 +14,7 @@ const navItems = [
 ]
 
 function SiteLayout() {
-  const { user, logout } = useAuth()
+  const { user, logout, hydrateUser } = useAuth()
   const authModalMode = useUiStore((state) => state.authModalMode)
   const successMessage = useUiStore((state) => state.successMessage)
   const isProfileMenuOpen = useUiStore((state) => state.isProfileMenuOpen)
@@ -22,6 +23,10 @@ function SiteLayout() {
   const setSuccessMessage = useUiStore((state) => state.setSuccessMessage)
   const toggleProfileMenuOpen = useUiStore((state) => state.toggleProfileMenuOpen)
   const setProfileMenuOpen = useUiStore((state) => state.setProfileMenuOpen)
+
+  useEffect(() => {
+    void hydrateUser()
+  }, [hydrateUser])
 
   return (
     <div className="min-h-screen">

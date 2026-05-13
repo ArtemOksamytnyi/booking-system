@@ -9,8 +9,12 @@ type RequireAuthProps = {
 }
 
 function RequireAuth({ allow, children }: RequireAuthProps) {
-  const { user } = useAuth()
+  const { user, isHydrating } = useAuth()
   const location = useLocation()
+
+  if (isHydrating) {
+    return <div className="section-container py-20 text-center text-slate-500">Loading account...</div>
+  }
 
   if (!user) {
     return <Navigate replace state={{ from: location.pathname }} to="/" />

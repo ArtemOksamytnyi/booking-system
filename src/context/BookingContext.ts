@@ -9,6 +9,7 @@ type BookingContextValue = {
   updateDraft: (partial: Partial<BookingDraft>) => void
   finalizeBooking: (userEmail: string) => BookingRecord | null
   getUserBookings: (userEmail: string) => BookingRecord[]
+  getAllBookings: () => BookingRecord[]
 }
 
 export const useBooking = (): BookingContextValue => {
@@ -19,6 +20,7 @@ export const useBooking = (): BookingContextValue => {
   const updateDraft = useBookingStore((state) => state.updateDraft)
   const finalizeBooking = useBookingStore((state) => state.finalizeBooking)
   const getUserBookings = useBookingStore((state) => state.getUserBookings)
+  const getAllBookings = useBookingStore((state) => state.getAllBookings)
 
   return {
     draft,
@@ -28,6 +30,7 @@ export const useBooking = (): BookingContextValue => {
     updateDraft,
     finalizeBooking,
     getUserBookings,
+    getAllBookings,
   }
 }
 

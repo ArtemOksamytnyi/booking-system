@@ -15,12 +15,12 @@ function ProfilePage() {
     return null
   }
 
-  const save = (event: FormEvent<HTMLFormElement>) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
     setMessage(null)
 
-    const result = updateProfile(name, email)
+    const result = await updateProfile(name, email)
     if (!result.ok) {
       setError(result.message)
       return

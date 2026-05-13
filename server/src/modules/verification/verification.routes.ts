@@ -5,6 +5,7 @@ import { createVerificationRequestSchema, reviewVerificationSchema } from './ver
 import {
   createVerificationRequest,
   listVerificationRequests,
+  listOwnerVerificationRequests,
   reviewVerificationRequest,
 } from './verification.service'
 
@@ -13,9 +14,13 @@ const verificationRouter = Router()
 verificationRouter.get(
   '/',
   requireAuth,
-  requireRole(['admin']),
-  asyncHandler(async (_req, res) => {
-    const requests = await listVerificationRequests()
+  asyncHandler(async (req, res) => {
+    const authUser = (req as AuthenticatedRequest).user!
+    const requests =
+      authUser.role === 'admin'
+        ? await listVerificationRequests()
+        : await listOwnerVerificationRequests(authUser.userId)
+
     res.json(requests)
   }),
 )

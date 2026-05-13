@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { createBookingRequest } from '../../api/bookings'
+import { createPaymentRequest } from '../../api/payments'
 import BookingHeader from '../../components/BookingHeader'
 import { useAuth } from '../../context/AuthContext'
 import { useBooking } from '../../context/BookingContext'
@@ -14,12 +17,39 @@ const daysBetween = (checkIn: string, checkOut: string) => {
 function PaymentPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { draft, finalizeBooking } = useBooking()
+  const { draft, clearDraft } = useBooking()
 
   const [cardNumber, setCardNumber] = useState('')
   const [bank, setBank] = useState('')
   const [expDate, setExpDate] = useState('')
   const [cvv, setCvv] = useState('')
+
+  const bookingMutation = useMutation({
+    mutationFn: async () => {
+      if (!draft) {
+        throw new Error('Booking draft is missing')
+      }
+
+      const days = daysBetween(draft.checkIn, draft.checkOut)
+      const initialPayment = Math.round((days * draft.roomPricePerNight) / 2)
+
+      const booking = await createBookingRequest({
+        roomId: draft.roomId,
+        startDatetime: `${draft.checkIn}T00:00:00.000Z`,
+        endDatetime: `${draft.checkOut}T00:00:00.000Z`,
+      })
+
+      await createPaymentRequest({
+        bookingId: booking.id,
+        amount: initialPayment,
+        paymentMethod: 'CARD',
+      })
+    },
+    onSuccess: () => {
+      clearDraft()
+      navigate('/payment/success')
+    },
+  })
 
   if (!user || !draft) {
     return <Navigate replace to="/hotels" />
@@ -29,15 +59,14 @@ function PaymentPage() {
   const total = days * draft.roomPricePerNight
   const initialPayment = Math.round(total / 2)
 
-  const payNow = (event: FormEvent<HTMLFormElement>) => {
+  const payNow = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (!cardNumber || !bank || !expDate || !cvv) {
       return
     }
 
-    finalizeBooking(user.email)
-    navigate('/payment/success')
+    await bookingMutation.mutateAsync()
   }
 
   return (
@@ -109,7 +138,7 @@ function PaymentPage() {
             className="mt-5 h-11 w-full rounded-2xl bg-primary text-base font-semibold text-white md:text-lg"
             type="submit"
           >
-            Pay Now
+            {bookingMutation.isPending ? 'Processing...' : 'Pay Now'}
           </button>
           <Link
             className="grid h-11 w-full place-items-center rounded-2xl bg-slate-100 text-base text-slate-400 md:text-lg"
