@@ -17,6 +17,7 @@ import {
   createRoomForOwner,
   getAvailableRooms,
   getPropertyById,
+  listPropertyTypes,
   listProperties,
   reviewPropertyVerification,
 } from './property.service'
@@ -37,6 +38,14 @@ propertyRouter.get(
     })
     const properties = await listProperties(filters)
     res.json(properties)
+  }),
+)
+
+propertyRouter.get(
+  '/types',
+  asyncHandler(async (_req, res) => {
+    const propertyTypes = await listPropertyTypes()
+    res.json(propertyTypes)
   }),
 )
 

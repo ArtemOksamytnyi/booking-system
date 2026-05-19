@@ -19,7 +19,7 @@ export const createPropertySchema = z.object({
 })
 
 export const createOwnerPropertySchema = z.object({
-  propertyTypeName: z.enum(['hotel', 'villa', 'apartment', 'resort']).default('hotel'),
+  propertyTypeName: z.string().trim().min(2).max(50).default('hotel'),
   name: z.string().min(2).max(120),
   address: z.string().trim().min(2).max(255),
   description: optionalTrimmedString,

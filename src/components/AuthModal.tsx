@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { getPropertyTypes } from '../api/properties'
 import { humanizeRole, useAuth } from '../context/AuthContext'
 import type { AuthRole } from '../context/AuthContext'
 
@@ -20,10 +22,10 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
   const [age, setAge] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<AuthRole>('user')
-  const [idDocument, setIdDocument] = useState<File | null>(null)
-  const [propertyDocument, setPropertyDocument] = useState<File | null>(null)
+  const [identityDocumentLink, setIdentityDocumentLink] = useState('')
+  const [propertyDocumentLink, setPropertyDocumentLink] = useState('')
   const [propertyName, setPropertyName] = useState('')
-  const [propertyTypeName, setPropertyTypeName] = useState<'hotel' | 'villa' | 'apartment' | 'resort'>('hotel')
+  const [propertyTypeName, setPropertyTypeName] = useState('hotel')
   const [propertyAddress, setPropertyAddress] = useState('')
   const [propertyDescription, setPropertyDescription] = useState('')
   const [propertyPhotoUrl, setPropertyPhotoUrl] = useState('')
@@ -35,6 +37,10 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
 
   const title = useMemo(() => (isRegister ? 'Create your account' : 'Welcome back'), [isRegister])
   const submitText = isRegister ? 'Create Account' : 'Login'
+  const { data: propertyTypes = [] } = useQuery({
+    queryKey: ['property-types'],
+    queryFn: getPropertyTypes,
+  })
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
@@ -49,8 +55,8 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
     event.preventDefault()
     setError(null)
 
-    if (isOwnerRegistration && (!idDocument || !propertyDocument)) {
-      setError('Hotel owner registration requires both identity and property documents.')
+    if (isOwnerRegistration && (!identityDocumentLink.trim() || !propertyDocumentLink.trim())) {
+      setError('Hotel owner registration requires both identity and property document links.')
       return
     }
 
@@ -68,9 +74,8 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
           propertyDescription,
           propertyPhotoUrl,
           ownerComment,
-          documents: isOwnerRegistration
-            ? [idDocument?.name ?? '', propertyDocument?.name ?? '']
-            : [],
+          identityDocumentLink,
+          propertyDocumentLink,
         })
       : login(email.trim().toLowerCase(), password)
 
@@ -216,14 +221,15 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
                   <select
                     className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
                     onChange={(event) =>
-                      setPropertyTypeName(event.target.value as 'hotel' | 'villa' | 'apartment' | 'resort')
+                      setPropertyTypeName(event.target.value)
                     }
                     value={propertyTypeName}
                   >
-                    <option value="hotel">Hotel</option>
-                    <option value="villa">Villa</option>
-                    <option value="apartment">Apartment</option>
-                    <option value="resort">Resort</option>
+                    {(propertyTypes.length > 0 ? propertyTypes : ['hotel']).map((propertyType) => (
+                      <option key={propertyType} value={propertyType}>
+                        {propertyType}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>
@@ -257,23 +263,25 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
                 />
               </label>
               <label className="grid gap-2">
-                <span className="text-xs text-slate-500">Identity document</span>
+                <span className="text-xs text-slate-500">Identity document link</span>
                 <input
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="text-sm"
-                  onChange={(event) => setIdDocument(event.target.files?.[0] ?? null)}
+                  className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                  onChange={(event) => setIdentityDocumentLink(event.target.value)}
+                  placeholder="https://..."
                   required
-                  type="file"
+                  type="url"
+                  value={identityDocumentLink}
                 />
               </label>
               <label className="grid gap-2">
-                <span className="text-xs text-slate-500">Property ownership document</span>
+                <span className="text-xs text-slate-500">Property ownership document link</span>
                 <input
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="text-sm"
-                  onChange={(event) => setPropertyDocument(event.target.files?.[0] ?? null)}
+                  className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                  onChange={(event) => setPropertyDocumentLink(event.target.value)}
+                  placeholder="https://..."
                   required
-                  type="file"
+                  type="url"
+                  value={propertyDocumentLink}
                 />
               </label>
               <label className="grid gap-2">

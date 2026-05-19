@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMyBookings, getOwnerBookings, updateBookingStatusRequest } from '../../api/bookings'
-import { createOwnerProperty, createRoomForProperty, getOwnerProperties } from '../../api/properties'
+import { createOwnerProperty, createRoomForProperty, getOwnerProperties, getPropertyTypes } from '../../api/properties'
 import { getMyReminders } from '../../api/reminders'
 import {
   getVerificationRequests,
@@ -28,7 +28,7 @@ function OwnerDashboardPage() {
   const setActiveTab = useUiStore((state) => state.setOwnerDashboardTab)
   const [hotelName, setHotelName] = useState('')
   const [hotelLocation, setHotelLocation] = useState('')
-  const [hotelType, setHotelType] = useState<'hotel' | 'villa' | 'apartment' | 'resort'>('hotel')
+  const [hotelType, setHotelType] = useState('hotel')
   const [hotelDescription, setHotelDescription] = useState('')
   const [hotelPhotoUrl, setHotelPhotoUrl] = useState('')
   const [verificationComment, setVerificationComment] = useState('')
@@ -44,6 +44,10 @@ function OwnerDashboardPage() {
     enabled: Boolean(user?.email),
     queryKey: ['owner-properties', user?.email],
     queryFn: () => getOwnerProperties(user!.email),
+  })
+  const { data: propertyTypes = [] } = useQuery({
+    queryKey: ['property-types'],
+    queryFn: getPropertyTypes,
   })
 
   const { data: personalBookings = [] } = useQuery({
@@ -274,18 +278,17 @@ function OwnerDashboardPage() {
               placeholder="Location, City"
               value={hotelLocation}
             />
-            <select
-              className="h-11 rounded-xl border border-slate-200 px-4 text-base"
-              onChange={(event) =>
-                setHotelType(event.target.value as 'hotel' | 'villa' | 'apartment' | 'resort')
-              }
-              value={hotelType}
-            >
-              <option value="hotel">Hotel</option>
-              <option value="villa">Villa</option>
-              <option value="apartment">Apartment</option>
-              <option value="resort">Resort</option>
-            </select>
+              <select
+                className="h-11 rounded-xl border border-slate-200 px-4 text-base"
+                onChange={(event) => setHotelType(event.target.value)}
+                value={hotelType}
+              >
+                {(propertyTypes.length > 0 ? propertyTypes : ['hotel']).map((propertyType) => (
+                  <option key={propertyType} value={propertyType}>
+                    {propertyType}
+                  </option>
+                ))}
+              </select>
             <input
               className="h-11 rounded-xl border border-slate-200 px-4 text-base"
               onChange={(event) => setHotelPhotoUrl(event.target.value)}

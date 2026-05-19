@@ -8,7 +8,6 @@ import { useUiStore } from '../store/uiStore'
 const navItems = [
   { label: 'Home', to: '/' },
   { label: 'Hotels', to: '/hotels' },
-  { label: 'Rooms', to: '/rooms' },
   { label: 'About', to: '/about' },
   { label: 'Contact', to: '/contact' },
 ]

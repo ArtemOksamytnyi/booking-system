@@ -1,4 +1,4 @@
-export type PropertyCategory = 'hotel' | 'villa' | 'apartment' | 'resort'
+export type PropertyCategory = string
 
 export type HotelRoom = {
   id: number

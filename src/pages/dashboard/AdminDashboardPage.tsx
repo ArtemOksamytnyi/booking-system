@@ -234,6 +234,7 @@ function AdminDashboardPage() {
 
     if (activeTab === 'owners') {
       return (
+
         <div className="space-y-5">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-left">

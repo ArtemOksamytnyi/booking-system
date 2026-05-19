@@ -61,6 +61,11 @@ export type OwnerProperty = Hotel & {
   verificationStatus: 'pending' | 'approved' | 'rejected'
 }
 
+type ApiPropertyType = {
+  id: number
+  name: string
+}
+
 const slugify = (value: string) =>
   value
     .toLowerCase()
@@ -184,7 +189,7 @@ export const createOwnerProperty = async (payload: {
   address: string
   description?: string
   photoUrl?: string
-  propertyTypeName?: 'hotel' | 'villa' | 'apartment' | 'resort'
+  propertyTypeName?: string
 }) => {
   const property = await apiFetch<ApiProperty>('/properties/owner', {
     method: 'POST',
@@ -195,6 +200,11 @@ export const createOwnerProperty = async (payload: {
   })
 
   return mapPropertyToOwnerHotel(property)
+}
+
+export const getPropertyTypes = async () => {
+  const propertyTypes = await apiFetch<ApiPropertyType[]>('/properties/types')
+  return propertyTypes.map((item) => item.name)
 }
 
 export const createRoomForProperty = async (

@@ -136,7 +136,7 @@ export const createProperty = async (ownerId: number, data: {
   })
 
 export const createPropertyForOwner = async (ownerId: number, data: {
-  propertyTypeName: 'hotel' | 'villa' | 'apartment' | 'resort'
+  propertyTypeName: string
   name: string
   address: string
   description?: string
@@ -150,8 +150,13 @@ export const createPropertyForOwner = async (ownerId: number, data: {
     throw new HttpError(404, 'Owner account not found')
   }
 
-  const propertyType = await prisma.propertyType.findUnique({
-    where: { name: data.propertyTypeName },
+  const propertyType = await prisma.propertyType.findFirst({
+    where: {
+      name: {
+        equals: data.propertyTypeName.trim(),
+        mode: 'insensitive',
+      },
+    },
   })
 
   if (!propertyType) {
@@ -181,6 +186,13 @@ export const createPropertyForOwner = async (ownerId: number, data: {
 
   return property
 }
+
+export const listPropertyTypes = async () =>
+  prisma.propertyType.findMany({
+    orderBy: {
+      name: 'asc',
+    },
+  })
 
 export const createRoomForOwner = async (
   propertyId: number,

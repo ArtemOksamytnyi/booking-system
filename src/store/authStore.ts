@@ -46,13 +46,14 @@ export type RegisterPayload = {
   role: AuthRole
   phone: string
   age?: number
-  documents?: string[]
   propertyName?: string
-  propertyTypeName?: 'hotel' | 'villa' | 'apartment' | 'resort'
+  propertyTypeName?: string
   propertyAddress?: string
   propertyDescription?: string
   propertyPhotoUrl?: string
   ownerComment?: string
+  identityDocumentLink?: string
+  propertyDocumentLink?: string
 }
 
 type AuthState = {
@@ -117,6 +118,8 @@ export const useAuthStore = create<AuthState>()(
         propertyDescription,
         propertyPhotoUrl,
         ownerComment,
+        identityDocumentLink,
+        propertyDocumentLink,
       }) => {
         try {
           const payload = await registerRequest({
@@ -147,7 +150,13 @@ export const useAuthStore = create<AuthState>()(
 
             await submitVerificationRequestToApi({
               propertyId: property.id,
-              comment: ownerComment?.trim() || undefined,
+              comment: [
+                ownerComment?.trim(),
+                identityDocumentLink?.trim() ? `Identity document: ${identityDocumentLink.trim()}` : null,
+                propertyDocumentLink?.trim() ? `Property document: ${propertyDocumentLink.trim()}` : null,
+              ]
+                .filter(Boolean)
+                .join('\n') || undefined,
             })
 
             return {

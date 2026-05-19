@@ -6,7 +6,6 @@ import ContactPage from './pages/ContactPage'
 import HomePage from './pages/HomePage'
 import HotelDetailsPage from './pages/HotelDetailsPage'
 import HotelsPage from './pages/HotelsPage'
-import RoomsPage from './pages/RoomsPage'
 import BookingInformationPage from './pages/booking/BookingInformationPage'
 import PaymentPage from './pages/booking/PaymentPage'
 import PaymentSuccessPage from './pages/booking/PaymentSuccessPage'
@@ -22,7 +21,6 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/hotels" element={<HotelsPage />} />
         <Route path="/hotels/:slug" element={<HotelDetailsPage />} />
-        <Route path="/rooms" element={<RoomsPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route
