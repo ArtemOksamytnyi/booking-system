@@ -48,9 +48,19 @@ export type DashboardBooking = {
   total: number
   initialPayment: number
   createdAt: string
+  bookingStatus: 'pending' | 'confirmed' | 'cancelled' | 'completed'
+  paymentStatus: 'pending' | 'partially_paid' | 'paid' | 'failed' | 'refunded'
+  isInactive: boolean
   renterName?: string
   renterEmail?: string
 }
+
+const statusOrder = {
+  pending: 0,
+  confirmed: 1,
+  completed: 2,
+  cancelled: 3,
+} as const
 
 const daysBetween = (checkIn: string, checkOut: string) => {
   const start = new Date(`${checkIn}T00:00:00`).getTime()
@@ -83,24 +93,45 @@ const mapBooking = (booking: ApiBooking): DashboardBooking => {
     total,
     initialPayment: Math.round(total / 2),
     createdAt: booking.createdAt,
+    bookingStatus: booking.bookingStatus.toLowerCase() as DashboardBooking['bookingStatus'],
+    paymentStatus: booking.paymentStatus.toLowerCase() as DashboardBooking['paymentStatus'],
+    isInactive: ['completed', 'cancelled'].includes(booking.bookingStatus.toLowerCase()),
     renterName: booking.renter ? `${booking.renter.firstName} ${booking.renter.lastName}`.trim() : undefined,
     renterEmail: booking.renter?.email,
   }
 }
 
+export const sortDashboardBookings = (bookings: DashboardBooking[]) =>
+  bookings
+    .slice()
+    .sort((left, right) => {
+      if (left.isInactive !== right.isInactive) {
+        return left.isInactive ? 1 : -1
+      }
+
+      const leftStatusOrder = statusOrder[left.bookingStatus]
+      const rightStatusOrder = statusOrder[right.bookingStatus]
+
+      if (leftStatusOrder !== rightStatusOrder) {
+        return leftStatusOrder - rightStatusOrder
+      }
+
+      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    })
+
 export const getMyBookings = async () => {
   const bookings = await apiFetch<ApiBooking[]>('/bookings')
-  return bookings.map(mapBooking)
+  return sortDashboardBookings(bookings.map(mapBooking))
 }
 
 export const getOwnerBookings = async () => {
   const bookings = await apiFetch<ApiBooking[]>('/bookings?scope=owner')
-  return bookings.map(mapBooking)
+  return sortDashboardBookings(bookings.map(mapBooking))
 }
 
 export const getAllBookings = async () => {
   const bookings = await apiFetch<ApiBooking[]>('/bookings?scope=all')
-  return bookings.map(mapBooking)
+  return sortDashboardBookings(bookings.map(mapBooking))
 }
 
 export const createBookingRequest = async (payload: {
@@ -111,4 +142,10 @@ export const createBookingRequest = async (payload: {
   apiFetch<ApiBooking>('/bookings', {
     method: 'POST',
     body: JSON.stringify(payload),
+  })
+
+export const updateBookingStatusRequest = async (bookingId: string, status: 'CONFIRMED' | 'CANCELLED') =>
+  apiFetch<ApiBooking>(`/bookings/${bookingId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   })

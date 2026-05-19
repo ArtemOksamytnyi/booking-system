@@ -1,4 +1,4 @@
-import { VerificationStatus } from '@prisma/client'
+import { BookingStatus, VerificationStatus } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { HttpError } from '../../utils/http'
 
@@ -73,6 +73,9 @@ export const listProperties = async (filters: ListPropertiesFilters = {}) =>
                   : {}),
                 bookings: {
                   none: {
+                    bookingStatus: {
+                      not: BookingStatus.CANCELLED,
+                    },
                     AND: [
                       {
                         startDatetime: {
@@ -164,13 +167,6 @@ export const createPropertyForOwner = async (ownerId: number, data: {
       description: data.description,
       photoUrl: data.photoUrl,
       verificationStatus: VerificationStatus.PENDING,
-      rooms: {
-        create: [
-          { name: 'звичайна', capacity: 2, pricePerUnit: 120 },
-          { name: 'люкс', capacity: 3, pricePerUnit: 180 },
-          { name: 'супер люкс', capacity: 5, pricePerUnit: 260 },
-        ],
-      },
     },
     include: {
       propertyType: true,
@@ -184,6 +180,42 @@ export const createPropertyForOwner = async (ownerId: number, data: {
   })
 
   return property
+}
+
+export const createRoomForOwner = async (
+  propertyId: number,
+  actor: { userId: number; role: 'user' | 'hotel_owner' | 'admin' },
+  data: {
+    name: string
+    capacity: number
+    pricePerUnit: number
+    isActive: boolean
+  },
+) => {
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+    include: {
+      owner: true,
+    },
+  })
+
+  if (!property) {
+    throw new HttpError(404, 'Property not found')
+  }
+
+  if (actor.role !== 'admin' && property.ownerId !== actor.userId) {
+    throw new HttpError(403, 'You do not have access to this property')
+  }
+
+  return prisma.room.create({
+    data: {
+      propertyId: property.id,
+      name: data.name,
+      capacity: data.capacity,
+      pricePerUnit: data.pricePerUnit,
+      isActive: data.isActive,
+    },
+  })
 }
 
 export const reviewPropertyVerification = async (input: {
@@ -277,6 +309,9 @@ export const getAvailableRooms = async (
       },
       bookings: {
         none: {
+          bookingStatus: {
+            not: BookingStatus.CANCELLED,
+          },
           AND: [
             {
               startDatetime: {

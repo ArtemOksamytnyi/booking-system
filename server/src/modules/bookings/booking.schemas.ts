@@ -5,3 +5,7 @@ export const createBookingSchema = z.object({
   startDatetime: z.iso.datetime(),
   endDatetime: z.iso.datetime(),
 })
+
+export const updateBookingStatusSchema = z.object({
+  status: z.enum(['CONFIRMED', 'CANCELLED']),
+})

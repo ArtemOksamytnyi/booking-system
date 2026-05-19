@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../../middleware/auth'
 import { asyncHandler } from '../../utils/async-handler'
 import {
+  createRoomSchema,
   createOwnerPropertySchema,
   createPropertySchema,
   listPropertiesSchema,
@@ -11,6 +12,7 @@ import {
 import {
   createProperty,
   createPropertyForOwner,
+  createRoomForOwner,
   getAvailableRooms,
   getPropertyById,
   listProperties,
@@ -44,6 +46,17 @@ propertyRouter.post(
     const input = createOwnerPropertySchema.parse(req.body)
     const property = await createPropertyForOwner((req as AuthenticatedRequest).user!.userId, input)
     res.status(201).json(property)
+  }),
+)
+
+propertyRouter.post(
+  '/:id/rooms',
+  requireAuth,
+  requireRole(['hotel_owner', 'admin']),
+  asyncHandler(async (req, res) => {
+    const input = createRoomSchema.parse(req.body)
+    const room = await createRoomForOwner(Number(req.params.id), (req as AuthenticatedRequest).user!, input)
+    res.status(201).json(room)
   }),
 )
 

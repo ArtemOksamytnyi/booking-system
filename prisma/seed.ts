@@ -8,6 +8,7 @@ import {
 } from '@prisma/client'
 
 const prisma = new PrismaClient()
+const seedPassword = 'password123'
 
 type SeedUser = {
   roleName: 'user' | 'hotel_owner' | 'admin'
@@ -27,13 +28,57 @@ type SeedProperty = {
   rating: number
   photoUrl: string
   verificationStatus: VerificationStatus
-  rooms: Array<{
-    name: string
-    capacity: number
-    pricePerUnit: number
-    isActive: boolean
-  }>
 }
+
+const ownerEmails = ['ina.owner@lankastay.com', 'devin.owner@lankastay.com', 'lena.owner@lankastay.com']
+const roomTemplates = [
+  { name: 'звичайна', capacity: 2, pricePerUnit: 110, isActive: true },
+  { name: 'люкс', capacity: 3, pricePerUnit: 175, isActive: true },
+  { name: 'супер люкс', capacity: 5, pricePerUnit: 255, isActive: true },
+]
+const propertyTypes = ['hotel', 'villa', 'apartment', 'resort'] as const
+const paymentMethods = [PaymentMethod.CARD, PaymentMethod.BANK_TRANSFER, PaymentMethod.CASH] as const
+const cities = [
+  'Galle, Sri Lanka',
+  'Ella, Sri Lanka',
+  'Kandy, Sri Lanka',
+  'Matara, Sri Lanka',
+  'Negombo, Sri Lanka',
+  'Trincomalee, Sri Lanka',
+  'Kotte, Sri Lanka',
+  'Mirissa, Sri Lanka',
+  'Nuwara Eliya, Sri Lanka',
+  'Bentota, Sri Lanka',
+  'Jaffna, Sri Lanka',
+  'Anuradhapura, Sri Lanka',
+  'Hikkaduwa, Sri Lanka',
+  'Sigiriya, Sri Lanka',
+  'Colombo, Sri Lanka',
+]
+const propertyNames = [
+  'Azure Retreat',
+  'Sunset Palm Villa',
+  'Hill Crown Ella',
+  'City Nest Kotte',
+  'Ocean Land Trincomalee',
+  'Green Vale Suites',
+  'Blue Dune Resort',
+  'Lagoon Pearl Stay',
+  'Skyline Harbor Hotel',
+  'Golden Cliff Villa',
+  'Forest Line Lodge',
+  'Coral Bay Residence',
+  'Tea Garden Escape',
+  'Harbor Mist Rooms',
+  'Moonstone Grand',
+]
+const photoUrls = [
+  'https://images.unsplash.com/photo-1613553507747-5f8d62ad5904?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1400&q=80',
+]
 
 const users: SeedUser[] = [
   {
@@ -45,123 +90,54 @@ const users: SeedUser[] = [
     age: 34,
   },
   {
-    roleName: 'user',
-    firstName: 'John',
-    lastName: 'Wick',
-    phone: '+94000000002',
-    email: 'user@lankastay.com',
-    age: 29,
-  },
-  {
     roleName: 'hotel_owner',
     firstName: 'Ina',
     lastName: 'Hogan',
-    phone: '+94000000003',
-    email: 'ina.owner@lankastay.com',
+    phone: '+94000000002',
+    email: ownerEmails[0],
     age: 31,
   },
   {
     roleName: 'hotel_owner',
     firstName: 'Devin',
     lastName: 'Harmon',
-    phone: '+94000000004',
-    email: 'devin.owner@lankastay.com',
+    phone: '+94000000003',
+    email: ownerEmails[1],
     age: 37,
   },
   {
     roleName: 'hotel_owner',
     firstName: 'Lena',
     lastName: 'Page',
-    phone: '+94000000005',
-    email: 'lena.owner@lankastay.com',
+    phone: '+94000000004',
+    email: ownerEmails[2],
     age: 33,
   },
+  ...Array.from({ length: 11 }, (_, index) => ({
+    roleName: 'user' as const,
+    firstName: `Traveler${index + 1}`,
+    lastName: 'Guest',
+    phone: `+94000000${String(index + 5).padStart(3, '0')}`,
+    email: index === 0 ? 'user@lankastay.com' : `user${index + 1}@lankastay.com`,
+    age: 23 + index,
+  })),
 ]
 
-const properties: SeedProperty[] = [
-  {
-    ownerEmail: 'ina.owner@lankastay.com',
-    propertyTypeName: 'resort',
-    name: 'Azure Retreat',
-    address: 'Matara, Sri Lanka',
-    description: 'Ocean-facing premium retreat with curated family and couple experiences.',
-    rating: 4.9,
-    photoUrl:
-      'https://images.unsplash.com/photo-1613553507747-5f8d62ad5904?auto=format&fit=crop&w=1400&q=80',
-    verificationStatus: VerificationStatus.APPROVED,
-    rooms: [
-      { name: 'звичайна', capacity: 2, pricePerUnit: 180, isActive: true },
-      { name: 'люкс', capacity: 3, pricePerUnit: 230, isActive: true },
-      { name: 'супер люкс', capacity: 5, pricePerUnit: 320, isActive: true },
-    ],
-  },
-  {
-    ownerEmail: 'ina.owner@lankastay.com',
-    propertyTypeName: 'villa',
-    name: 'Sunset Palm Villa',
-    address: 'Galle, Sri Lanka',
-    description: 'A private villa near the coast with a quiet pool and palm garden.',
-    rating: 4.7,
-    photoUrl:
-      'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1400&q=80',
-    verificationStatus: VerificationStatus.APPROVED,
-    rooms: [
-      { name: 'звичайна', capacity: 2, pricePerUnit: 120, isActive: true },
-      { name: 'люкс', capacity: 4, pricePerUnit: 175, isActive: true },
-      { name: 'супер люкс', capacity: 6, pricePerUnit: 260, isActive: true },
-    ],
-  },
-  {
-    ownerEmail: 'devin.owner@lankastay.com',
-    propertyTypeName: 'hotel',
-    name: 'Hill Crown Ella',
-    address: 'Ella, Sri Lanka',
-    description: 'Mountain hotel with valley views and guided hiking tours.',
-    rating: 4.8,
-    photoUrl:
-      'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1400&q=80',
-    verificationStatus: VerificationStatus.APPROVED,
-    rooms: [
-      { name: 'звичайна', capacity: 2, pricePerUnit: 115, isActive: true },
-      { name: 'люкс', capacity: 3, pricePerUnit: 155, isActive: true },
-      { name: 'супер люкс', capacity: 5, pricePerUnit: 210, isActive: true },
-    ],
-  },
-  {
-    ownerEmail: 'devin.owner@lankastay.com',
-    propertyTypeName: 'apartment',
-    name: 'City Nest Kotte',
-    address: 'Kotte, Sri Lanka',
-    description: 'Short-stay city property focused on business and transit comfort.',
-    rating: 4.3,
-    photoUrl:
-      'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1400&q=80',
-    verificationStatus: VerificationStatus.PENDING,
-    rooms: [
-      { name: 'звичайна', capacity: 2, pricePerUnit: 90, isActive: true },
-      { name: 'люкс', capacity: 3, pricePerUnit: 135, isActive: true },
-      { name: 'супер люкс', capacity: 4, pricePerUnit: 185, isActive: true },
-    ],
-  },
-  {
-    ownerEmail: 'lena.owner@lankastay.com',
-    propertyTypeName: 'hotel',
-    name: 'Ocean Land Trincomalee',
-    address: 'Trincomalee, Sri Lanka',
-    description: 'Beachfront hotel with private decks and family-friendly rooms.',
-    rating: 4.6,
-    photoUrl:
-      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1400&q=80',
-    verificationStatus: VerificationStatus.REJECTED,
-    rooms: [
-      { name: 'звичайна', capacity: 2, pricePerUnit: 132, isActive: true },
-      { name: 'люкс', capacity: 3, pricePerUnit: 182, isActive: true },
-      { name: 'супер люкс', capacity: 5, pricePerUnit: 245, isActive: true },
-    ],
-  },
-]
-
-const seedPassword = 'password123'
+const properties: SeedProperty[] = Array.from({ length: 15 }, (_, index) => ({
+  ownerEmail: ownerEmails[index % ownerEmails.length],
+  propertyTypeName: propertyTypes[index % propertyTypes.length],
+  name: propertyNames[index],
+  address: cities[index],
+  description: `Curated stay option ${index + 1} with strong local atmosphere and flexible room inventory.`,
+  rating: Number((4 + ((index % 9) * 0.1)).toFixed(1)),
+  photoUrl: photoUrls[index % photoUrls.length],
+  verificationStatus:
+    index < 9
+      ? VerificationStatus.APPROVED
+      : index < 12
+        ? VerificationStatus.PENDING
+        : VerificationStatus.REJECTED,
+}))
 
 async function upsertUsers(passwordHash: string) {
   const roles = await Promise.all(
@@ -205,8 +181,8 @@ async function upsertUsers(passwordHash: string) {
 }
 
 async function upsertPropertyTypes() {
-  const propertyTypes = await Promise.all(
-    ['hotel', 'villa', 'apartment', 'resort'].map((name) =>
+  const created = await Promise.all(
+    propertyTypes.map((name) =>
       prisma.propertyType.upsert({
         where: { name },
         update: {},
@@ -215,7 +191,7 @@ async function upsertPropertyTypes() {
     ),
   )
 
-  return new Map(propertyTypes.map((propertyType) => [propertyType.name, propertyType]))
+  return new Map(created.map((type) => [type.name, type]))
 }
 
 async function upsertProperties(
@@ -224,7 +200,7 @@ async function upsertProperties(
 ) {
   const createdProperties = []
 
-  for (const property of properties) {
+  for (const [index, property] of properties.entries()) {
     const owner = userMap.get(property.ownerEmail)
     const propertyType = propertyTypeMap.get(property.propertyTypeName)
 
@@ -235,7 +211,7 @@ async function upsertProperties(
     const existingProperty = await prisma.property.findFirst({
       where: {
         name: property.name,
-        address: property.address,
+        ownerId: owner.id,
       },
     })
 
@@ -243,8 +219,8 @@ async function upsertProperties(
       ? await prisma.property.update({
           where: { id: existingProperty.id },
           data: {
-            ownerId: owner.id,
             propertyTypeId: propertyType.id,
+            address: property.address,
             description: property.description,
             rating: property.rating,
             photoUrl: property.photoUrl,
@@ -266,31 +242,32 @@ async function upsertProperties(
 
     createdProperties.push(savedProperty)
 
-    for (const room of property.rooms) {
+    for (const [roomIndex, room] of roomTemplates.entries()) {
+      const roomName = room.name
       const existingRoom = await prisma.room.findFirst({
         where: {
           propertyId: savedProperty.id,
-          name: room.name,
+          name: roomName,
         },
       })
+
+      const roomData = {
+        capacity: room.capacity + (index % 2),
+        pricePerUnit: room.pricePerUnit + index * 7 + roomIndex * 9,
+        isActive: room.isActive,
+      }
 
       if (existingRoom) {
         await prisma.room.update({
           where: { id: existingRoom.id },
-          data: {
-            capacity: room.capacity,
-            pricePerUnit: room.pricePerUnit,
-            isActive: room.isActive,
-          },
+          data: roomData,
         })
       } else {
         await prisma.room.create({
           data: {
             propertyId: savedProperty.id,
-            name: room.name,
-            capacity: room.capacity,
-            pricePerUnit: room.pricePerUnit,
-            isActive: room.isActive,
+            name: roomName,
+            ...roomData,
           },
         })
       }
@@ -302,59 +279,41 @@ async function upsertProperties(
 
 async function seedVerificationRequests(
   userMap: Map<string, { id: number }>,
-  propertyMap: Map<string, { id: number }>,
+  propertyMap: Map<string, { id: number; verificationStatus: VerificationStatus }>,
 ) {
   const admin = userMap.get('admin@lankastay.com')
-  const verificationScenarios = [
-    {
-      ownerEmail: 'ina.owner@lankastay.com',
-      propertyName: 'Azure Retreat',
-      status: VerificationStatus.APPROVED,
-      comment: 'Ownership documents validated successfully.',
-    },
-    {
-      ownerEmail: 'devin.owner@lankastay.com',
-      propertyName: 'City Nest Kotte',
-      status: VerificationStatus.PENDING,
-      comment: 'Waiting for additional property proof.',
-    },
-    {
-      ownerEmail: 'lena.owner@lankastay.com',
-      propertyName: 'Ocean Land Trincomalee',
-      status: VerificationStatus.REJECTED,
-      comment: 'The uploaded documents do not match the property record.',
-    },
-  ]
 
-  for (const scenario of verificationScenarios) {
-    const owner = userMap.get(scenario.ownerEmail)
-    const property = propertyMap.get(scenario.propertyName)
+  for (const property of properties) {
+    const owner = userMap.get(property.ownerEmail)
+    const savedProperty = propertyMap.get(property.name)
 
-    if (!owner || !property) {
+    if (!owner || !savedProperty) {
       continue
     }
 
     const existingRequest = await prisma.verificationRequest.findFirst({
       where: {
         ownerId: owner.id,
-        propertyId: property.id,
+        propertyId: savedProperty.id,
       },
     })
 
     const data = {
       ownerId: owner.id,
-      propertyId: property.id,
-      adminId: scenario.status === VerificationStatus.PENDING ? null : admin?.id ?? null,
-      status: scenario.status,
-      decisionDate: scenario.status === VerificationStatus.PENDING ? null : new Date(),
-      comment: scenario.comment,
+      propertyId: savedProperty.id,
+      adminId: savedProperty.verificationStatus === VerificationStatus.PENDING ? null : admin?.id ?? null,
+      status: savedProperty.verificationStatus,
+      decisionDate: savedProperty.verificationStatus === VerificationStatus.PENDING ? null : new Date('2026-05-01T10:00:00.000Z'),
+      comment:
+        savedProperty.verificationStatus === VerificationStatus.APPROVED
+          ? 'Documents approved by admin.'
+          : savedProperty.verificationStatus === VerificationStatus.REJECTED
+            ? 'Ownership document requires correction.'
+            : 'Waiting for admin review.',
     }
 
     if (existingRequest) {
-      await prisma.verificationRequest.update({
-        where: { id: existingRequest.id },
-        data,
-      })
+      await prisma.verificationRequest.update({ where: { id: existingRequest.id }, data })
     } else {
       await prisma.verificationRequest.create({ data })
     }
@@ -365,51 +324,21 @@ async function seedBookingsAndPayments(
   userMap: Map<string, { id: number }>,
   propertyMap: Map<string, { id: number }>,
 ) {
-  const renter = userMap.get('user@lankastay.com')
-  if (!renter) {
-    return
-  }
+  const renterEmails = users.filter((user) => user.roleName === 'user').map((user) => user.email)
+  const approvedProperties = properties.filter((property) => property.verificationStatus === VerificationStatus.APPROVED)
 
-  const bookingScenarios = [
-    {
-      propertyName: 'Azure Retreat',
-      roomName: 'люкс',
-      startDatetime: new Date('2026-05-20T14:00:00.000Z'),
-      endDatetime: new Date('2026-05-23T11:00:00.000Z'),
-      bookingStatus: BookingStatus.CONFIRMED,
-      paymentStatus: PaymentStatus.PARTIALLY_PAID,
-      paidAmount: 345,
-    },
-    {
-      propertyName: 'Hill Crown Ella',
-      roomName: 'звичайна',
-      startDatetime: new Date('2026-06-10T14:00:00.000Z'),
-      endDatetime: new Date('2026-06-13T11:00:00.000Z'),
-      bookingStatus: BookingStatus.PENDING,
-      paymentStatus: PaymentStatus.PENDING,
-      paidAmount: 0,
-    },
-    {
-      propertyName: 'Sunset Palm Villa',
-      roomName: 'супер люкс',
-      startDatetime: new Date('2026-07-01T14:00:00.000Z'),
-      endDatetime: new Date('2026-07-05T11:00:00.000Z'),
-      bookingStatus: BookingStatus.COMPLETED,
-      paymentStatus: PaymentStatus.PAID,
-      paidAmount: 1040,
-    },
-  ]
+  for (let index = 0; index < 15; index += 1) {
+    const renter = userMap.get(renterEmails[index % renterEmails.length])
+    const property = propertyMap.get(approvedProperties[index % approvedProperties.length].name)
 
-  for (const scenario of bookingScenarios) {
-    const property = propertyMap.get(scenario.propertyName)
-    if (!property) {
+    if (!renter || !property) {
       continue
     }
 
     const room = await prisma.room.findFirst({
       where: {
         propertyId: property.id,
-        name: scenario.roomName,
+        name: roomTemplates[index % roomTemplates.length].name,
       },
     })
 
@@ -417,19 +346,34 @@ async function seedBookingsAndPayments(
       continue
     }
 
-    const nights = Math.max(
-      1,
-      Math.ceil((scenario.endDatetime.getTime() - scenario.startDatetime.getTime()) / (1000 * 60 * 60 * 24)),
-    )
+    const startDatetime = new Date(Date.UTC(2026, 4, 1 + index * 2, 14, 0, 0))
+    const endDatetime = new Date(Date.UTC(2026, 4, 3 + index * 2, 11, 0, 0))
+    const bookingStatus =
+      index < 5
+        ? BookingStatus.COMPLETED
+        : index < 10
+          ? BookingStatus.CONFIRMED
+          : index < 13
+            ? BookingStatus.PENDING
+            : BookingStatus.CANCELLED
+    const paymentStatus =
+      bookingStatus === BookingStatus.CANCELLED
+        ? PaymentStatus.REFUNDED
+        : index % 3 === 0
+          ? PaymentStatus.PARTIALLY_PAID
+          : PaymentStatus.PAID
+
+    const nights = 2
     const totalPrice = Number(room.pricePerUnit) * nights
     const serviceFee = Number((totalPrice * 0.1).toFixed(2))
     const ownerIncome = Number((totalPrice - serviceFee).toFixed(2))
+    const amount = paymentStatus === PaymentStatus.PARTIALLY_PAID ? Math.round(totalPrice / 2) : totalPrice
 
     const existingBooking = await prisma.booking.findFirst({
       where: {
         roomId: room.id,
         renterId: renter.id,
-        startDatetime: scenario.startDatetime,
+        startDatetime,
       },
     })
 
@@ -437,54 +381,39 @@ async function seedBookingsAndPayments(
       ? await prisma.booking.update({
           where: { id: existingBooking.id },
           data: {
-            endDatetime: scenario.endDatetime,
+            endDatetime,
             totalPrice,
             serviceFee,
             ownerIncome,
-            bookingStatus: scenario.bookingStatus,
-            paymentStatus: scenario.paymentStatus,
+            bookingStatus,
+            paymentStatus,
           },
         })
       : await prisma.booking.create({
           data: {
             roomId: room.id,
             renterId: renter.id,
-            startDatetime: scenario.startDatetime,
-            endDatetime: scenario.endDatetime,
+            startDatetime,
+            endDatetime,
             totalPrice,
             serviceFee,
             ownerIncome,
-            bookingStatus: scenario.bookingStatus,
-            paymentStatus: scenario.paymentStatus,
+            bookingStatus,
+            paymentStatus,
           },
         })
 
-    const existingPayment = await prisma.payment.findFirst({
-      where: {
-        bookingId: booking.id,
-      },
-    })
+    const existingPayment = await prisma.payment.findFirst({ where: { bookingId: booking.id } })
+    const paymentData = {
+      amount,
+      paymentMethod: paymentMethods[index % paymentMethods.length],
+      paymentStatus,
+    }
 
-    if (scenario.paidAmount > 0) {
-      if (existingPayment) {
-        await prisma.payment.update({
-          where: { id: existingPayment.id },
-          data: {
-            amount: scenario.paidAmount,
-            paymentMethod: PaymentMethod.CARD,
-            paymentStatus: scenario.paymentStatus,
-          },
-        })
-      } else {
-        await prisma.payment.create({
-          data: {
-            bookingId: booking.id,
-            amount: scenario.paidAmount,
-            paymentMethod: PaymentMethod.CARD,
-            paymentStatus: scenario.paymentStatus,
-          },
-        })
-      }
+    if (existingPayment) {
+      await prisma.payment.update({ where: { id: existingPayment.id }, data: paymentData })
+    } else {
+      await prisma.payment.create({ data: { bookingId: booking.id, ...paymentData } })
     }
 
     const existingReminder = await prisma.reminder.findFirst({
@@ -494,73 +423,57 @@ async function seedBookingsAndPayments(
       },
     })
 
-    if (!existingReminder) {
+    if (existingReminder) {
+      await prisma.reminder.update({
+        where: { id: existingReminder.id },
+        data: {
+          remindAt: new Date(startDatetime.getTime() - 24 * 60 * 60 * 1000),
+          isSent: bookingStatus === BookingStatus.COMPLETED,
+        },
+      })
+    } else {
       await prisma.reminder.create({
         data: {
           bookingId: booking.id,
           userId: renter.id,
-          remindAt: new Date(scenario.startDatetime.getTime() - 24 * 60 * 60 * 1000),
-          isSent: scenario.bookingStatus === BookingStatus.COMPLETED,
+          remindAt: new Date(startDatetime.getTime() - 24 * 60 * 60 * 1000),
+          isSent: bookingStatus === BookingStatus.COMPLETED,
         },
       })
     }
   }
 }
 
-async function seedReviews(userMap: Map<string, { id: number }>, propertyMap: Map<string, { id: number }>) {
-  const renter = userMap.get('user@lankastay.com')
-  if (!renter) {
-    return
-  }
+async function seedReviews(
+  userMap: Map<string, { id: number }>,
+  propertyMap: Map<string, { id: number }>,
+) {
+  const renterEmails = users.filter((user) => user.roleName === 'user').map((user) => user.email)
 
-  const reviewScenarios = [
-    {
-      propertyName: 'Azure Retreat',
-      rating: 5,
-      comment: 'Amazing stay, very smooth check-in and excellent service.',
-    },
-    {
-      propertyName: 'Sunset Palm Villa',
-      rating: 4,
-      comment: 'Beautiful place with great privacy and nice rooms.',
-    },
-    {
-      propertyName: 'Hill Crown Ella',
-      rating: 5,
-      comment: 'Perfect mountain view and very friendly staff.',
-    },
-  ]
+  for (let index = 0; index < 15; index += 1) {
+    const reviewer = userMap.get(renterEmails[index % renterEmails.length])
+    const property = propertyMap.get(properties[index].name)
 
-  for (const scenario of reviewScenarios) {
-    const property = propertyMap.get(scenario.propertyName)
-    if (!property) {
+    if (!reviewer || !property) {
       continue
     }
 
     const existingReview = await prisma.review.findFirst({
       where: {
         propertyId: property.id,
-        userId: renter.id,
+        userId: reviewer.id,
       },
     })
 
+    const reviewData = {
+      rating: 3 + (index % 3),
+      comment: `Demo review ${index + 1} for ${properties[index].name}.`,
+    }
+
     if (existingReview) {
-      await prisma.review.update({
-        where: { id: existingReview.id },
-        data: {
-          rating: scenario.rating,
-          comment: scenario.comment,
-        },
-      })
+      await prisma.review.update({ where: { id: existingReview.id }, data: reviewData })
     } else {
-      await prisma.review.create({
-        data: {
-          propertyId: property.id,
-          userId: renter.id,
-          rating: scenario.rating,
-          comment: scenario.comment,
-        },
-      })
+      await prisma.review.create({ data: { propertyId: property.id, userId: reviewer.id, ...reviewData } })
     }
   }
 }
@@ -577,7 +490,6 @@ async function main() {
   await seedReviews(userMap, propertyMap)
 
   console.log('Seed completed successfully.')
-  console.log('Users:')
   console.log('admin@lankastay.com / password123')
   console.log('user@lankastay.com / password123')
   console.log('ina.owner@lankastay.com / password123')

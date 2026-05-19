@@ -62,11 +62,12 @@ export const getVerificationRequests = async () => {
 export const submitVerificationRequestToApi = async (payload: {
   propertyId: number
   comment?: string
-}) =>
+}) => 
   apiFetch<ApiVerificationRequest>('/verification-requests', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  })
+ method: 'POST',
+  body: JSON.stringify(payload),
+  }
+)
 
 export const reviewVerificationRequestInApi = async (payload: {
   requestId: string

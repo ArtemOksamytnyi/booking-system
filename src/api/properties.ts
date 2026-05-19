@@ -172,13 +172,27 @@ export const createOwnerProperty = async (payload: {
   const property = await apiFetch<ApiProperty>('/properties/owner', {
     method: 'POST',
     body: JSON.stringify({
-      propertyTypeName: payload.propertyTypeName ?? 'hotel',
       ...payload,
+      propertyTypeName: payload.propertyTypeName ?? 'hotel',
     }),
   })
 
   return mapPropertyToOwnerHotel(property)
 }
+
+export const createRoomForProperty = async (
+  propertyId: number,
+  payload: {
+    name: string
+    capacity: number
+    pricePerUnit: number
+    isActive: boolean
+  },
+) =>
+  apiFetch(`/properties/${propertyId}/rooms`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
 
 export const reviewPropertyVerificationStatus = async (payload: {
   ownerEmail: string

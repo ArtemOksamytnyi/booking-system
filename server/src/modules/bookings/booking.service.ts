@@ -1,5 +1,6 @@
-import { PaymentStatus, BookingStatus } from '@prisma/client'
+import { BookingStatus, PaymentStatus } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
+import type { AuthenticatedUser } from '../../types/auth'
 import { calculateBookingTotals } from '../../utils/booking'
 import { HttpError } from '../../utils/http'
 
@@ -9,11 +10,31 @@ const countNights = (start: Date, end: Date) => {
   return Math.max(nights, 1)
 }
 
-export const createBooking = async (renterId: number, input: {
-  roomId: number
-  startDatetime: Date
-  endDatetime: Date
-}) => {
+export const syncExpiredBookings = async () =>
+  prisma.booking.updateMany({
+    where: {
+      endDatetime: {
+        lt: new Date(),
+      },
+      bookingStatus: {
+        in: [BookingStatus.PENDING, BookingStatus.CONFIRMED],
+      },
+    },
+    data: {
+      bookingStatus: BookingStatus.COMPLETED,
+    },
+  })
+
+export const createBooking = async (
+  renterId: number,
+  input: {
+    roomId: number
+    startDatetime: Date
+    endDatetime: Date
+  },
+) => {
+  await syncExpiredBookings()
+
   if (input.endDatetime <= input.startDatetime) {
     throw new HttpError(400, 'Check-out must be later than check-in')
   }
@@ -23,6 +44,9 @@ export const createBooking = async (renterId: number, input: {
     include: {
       bookings: {
         where: {
+          bookingStatus: {
+            not: BookingStatus.CANCELLED,
+          },
           AND: [
             { startDatetime: { lt: input.endDatetime } },
             { endDatetime: { gt: input.startDatetime } },
@@ -65,8 +89,10 @@ export const createBooking = async (renterId: number, input: {
   })
 }
 
-export const listUserBookings = async (userId: number) =>
-  prisma.booking.findMany({
+export const listUserBookings = async (userId: number) => {
+  await syncExpiredBookings()
+
+  return prisma.booking.findMany({
     where: { renterId: userId },
     include: {
       room: {
@@ -80,9 +106,12 @@ export const listUserBookings = async (userId: number) =>
       createdAt: 'desc',
     },
   })
+}
 
-export const listOwnerBookings = async (ownerId: number) =>
-  prisma.booking.findMany({
+export const listOwnerBookings = async (ownerId: number) => {
+  await syncExpiredBookings()
+
+  return prisma.booking.findMany({
     where: {
       room: {
         property: {
@@ -107,9 +136,12 @@ export const listOwnerBookings = async (ownerId: number) =>
       createdAt: 'desc',
     },
   })
+}
 
-export const listAllBookings = async () =>
-  prisma.booking.findMany({
+export const listAllBookings = async () => {
+  await syncExpiredBookings()
+
+  return prisma.booking.findMany({
     include: {
       room: {
         include: {
@@ -127,3 +159,69 @@ export const listAllBookings = async () =>
       createdAt: 'desc',
     },
   })
+}
+
+export const updateBookingStatus = async (
+  actor: AuthenticatedUser,
+  bookingId: number,
+  status: 'CONFIRMED' | 'CANCELLED',
+) => {
+  await syncExpiredBookings()
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      room: {
+        include: {
+          property: true,
+        },
+      },
+      renter: true,
+    },
+  })
+
+  if (!booking) {
+    throw new HttpError(404, 'Booking not found')
+  }
+
+  const isOwner = booking.room.property.ownerId === actor.userId
+  const isRenter = booking.renterId === actor.userId
+  const isAdmin = actor.role === 'admin'
+
+  if (!isOwner && !isRenter && !isAdmin) {
+    throw new HttpError(403, 'You do not have access to this booking')
+  }
+
+  if (status === 'CONFIRMED' && !isOwner && !isAdmin) {
+    throw new HttpError(403, 'Only owner or admin can confirm a booking')
+  }
+
+  if (status === 'CANCELLED' && booking.bookingStatus === BookingStatus.COMPLETED) {
+    throw new HttpError(400, 'Completed bookings cannot be cancelled')
+  }
+
+  return prisma.booking.update({
+    where: { id: booking.id },
+    data: {
+      bookingStatus: BookingStatus[status],
+      ...(status === 'CANCELLED' && booking.paymentStatus === PaymentStatus.PAID
+        ? {
+            paymentStatus: PaymentStatus.REFUNDED,
+          }
+        : {}),
+    },
+    include: {
+      room: {
+        include: {
+          property: true,
+        },
+      },
+      renter: {
+        include: {
+          role: true,
+        },
+      },
+      payments: true,
+    },
+  })
+}

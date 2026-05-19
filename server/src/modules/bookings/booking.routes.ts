@@ -1,8 +1,9 @@
 import { Router } from 'express'
 import { requireAuth, type AuthenticatedRequest } from '../../middleware/auth'
 import { asyncHandler } from '../../utils/async-handler'
-import { createBookingSchema } from './booking.schemas'
-import { createBooking, listAllBookings, listOwnerBookings, listUserBookings } from './booking.service'
+import { createBookingSchema, updateBookingStatusSchema } from './booking.schemas'
+import { createBooking, listAllBookings, listOwnerBookings, listUserBookings, updateBookingStatus } from './booking.service'
+import { BookingStatus } from '@prisma/client'
 
 const bookingRouter = Router()
 
@@ -35,6 +36,19 @@ bookingRouter.post(
       endDatetime: new Date(input.endDatetime),
     })
     res.status(201).json(booking)
+  }),
+)
+
+bookingRouter.patch(
+  '/:id/status',
+  asyncHandler(async (req, res) => {
+    const input = updateBookingStatusSchema.parse(req.body)
+    const booking = await updateBookingStatus(
+      (req as AuthenticatedRequest).user!,
+      Number(req.params.id),
+      BookingStatus[input.status],
+    )
+    res.json(booking)
   }),
 )
 

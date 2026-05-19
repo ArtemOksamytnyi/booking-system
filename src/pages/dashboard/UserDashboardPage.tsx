@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { getMyBookings } from '../../api/bookings'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getMyBookings, updateBookingStatusRequest } from '../../api/bookings'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateRange } from '../../context/BookingContext'
 import { useUiStore } from '../../store/uiStore'
@@ -16,6 +16,7 @@ const tabItems: Array<{ id: UserDashboardTab; label: string }> = [
 
 function UserDashboardPage() {
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const activeTab = useUiStore((state) => state.userDashboardTab)
   const setActiveTab = useUiStore((state) => state.setUserDashboardTab)
 
@@ -23,6 +24,16 @@ function UserDashboardPage() {
     enabled: Boolean(user),
     queryKey: ['dashboard-bookings', 'me'],
     queryFn: getMyBookings,
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: (bookingId: string) => updateBookingStatusRequest(bookingId, 'CANCELLED'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'owner'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'all'] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
+    },
   })
 
   const content = () => {
@@ -53,7 +64,12 @@ function UserDashboardPage() {
       return (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {bookings.map((booking) => (
-            <article key={booking.id} className="rounded-2xl border border-slate-300 p-3">
+            <article
+              key={booking.id}
+              className={`rounded-2xl border p-3 transition ${
+                booking.isInactive ? 'border-slate-200 bg-slate-100/80 opacity-70' : 'border-slate-300 bg-white'
+              }`}
+            >
               <div className="relative overflow-hidden rounded-2xl">
                 <img alt={booking.hotelName} className="h-52 w-full object-cover" src={booking.image} />
                 <span className="absolute right-0 top-0 rounded-bl-xl bg-primary px-3 py-2 text-xs font-medium text-white">
@@ -66,8 +82,20 @@ function UserDashboardPage() {
                 <p className="text-lg">{formatDateRange(booking.checkIn, booking.checkOut)}</p>
                 <p className="text-lg">{booking.days} Days</p>
                 <p className="text-lg">Guests: {booking.guests}</p>
+                <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
+                  Status: {booking.bookingStatus.replace('_', ' ')}
+                </p>
                 <p className="text-lg">Initial Payment ${booking.initialPayment}</p>
                 <p className="text-xl font-semibold text-slate-900">Total Payment ${booking.total}</p>
+                {!booking.isInactive ? (
+                  <button
+                    className="mt-2 rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-600"
+                    onClick={() => cancelMutation.mutate(booking.id)}
+                    type="button"
+                  >
+                    Cancel Booking
+                  </button>
+                ) : null}
               </div>
             </article>
           ))}

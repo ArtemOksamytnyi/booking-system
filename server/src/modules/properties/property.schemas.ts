@@ -1,21 +1,36 @@
 import { z } from 'zod'
 
 const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+const optionalTrimmedString = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().max(5000).optional(),
+)
+const optionalUrlString = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().url().optional(),
+)
 
 export const createPropertySchema = z.object({
   propertyTypeId: z.number().int().positive(),
   name: z.string().min(2).max(120),
-  address: z.string().min(5).max(255),
-  description: z.string().max(5000).optional(),
-  photoUrl: z.string().url().optional(),
+  address: z.string().trim().min(2).max(255),
+  description: optionalTrimmedString,
+  photoUrl: optionalUrlString,
 })
 
 export const createOwnerPropertySchema = z.object({
   propertyTypeName: z.enum(['hotel', 'villa', 'apartment', 'resort']).default('hotel'),
   name: z.string().min(2).max(120),
-  address: z.string().min(5).max(255),
-  description: z.string().max(5000).optional(),
-  photoUrl: z.string().url().optional(),
+  address: z.string().trim().min(2).max(255),
+  description: optionalTrimmedString,
+  photoUrl: optionalUrlString,
+})
+
+export const createRoomSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  capacity: z.coerce.number().int().positive(),
+  pricePerUnit: z.coerce.number().positive(),
+  isActive: z.boolean().default(true),
 })
 
 export const listPropertiesSchema = z.object({

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getAllBookings, getMyBookings } from '../../api/bookings'
+import { getAllBookings, getMyBookings, updateBookingStatusRequest } from '../../api/bookings'
 import { getUsers } from '../../api/users'
 import {
   getVerificationRequests,
@@ -106,6 +106,16 @@ function AdminDashboardPage() {
     },
   })
 
+  const bookingStatusMutation = useMutation({
+    mutationFn: (bookingId: string) => updateBookingStatusRequest(bookingId, 'CANCELLED'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'owner'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'all'] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
+    },
+  })
+
   const handleReview = async (status: 'approved' | 'rejected') => {
     if (!selectedRequestId) {
       return
@@ -119,7 +129,12 @@ function AdminDashboardPage() {
   const renderBookingCards = (bookings: typeof myBookings, emptyLabel: string, showRenter = false) => (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {bookings.map((booking) => (
-        <article key={booking.id} className="rounded-2xl border border-slate-200 p-3">
+        <article
+          key={booking.id}
+          className={`rounded-2xl border p-3 transition ${
+            booking.isInactive ? 'border-slate-200 bg-slate-100/80 opacity-70' : 'border-slate-200 bg-white'
+          }`}
+        >
           <div className="relative overflow-hidden rounded-2xl">
             <img alt={booking.hotelName} className="h-44 w-full object-cover" src={booking.image} />
             <span className="absolute right-0 top-0 rounded-bl-xl bg-primary px-3 py-2 text-xs font-medium text-white">
@@ -132,10 +147,22 @@ function AdminDashboardPage() {
             <p className="text-base">{formatDateRange(booking.checkIn, booking.checkOut)}</p>
             <p className="text-base">{booking.days} Days</p>
             <p className="text-base">Room: {booking.roomName}</p>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
+              Status: {booking.bookingStatus.replace('_', ' ')}
+            </p>
             {showRenter && booking.renterName ? (
               <p className="text-base text-slate-600">Guest: {booking.renterName}</p>
             ) : null}
             <p className="text-lg font-semibold text-slate-900">Total Payment ${booking.total}</p>
+            {!booking.isInactive ? (
+              <button
+                className="mt-2 rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-600"
+                onClick={() => bookingStatusMutation.mutate(booking.id)}
+                type="button"
+              >
+                Cancel Booking
+              </button>
+            ) : null}
           </div>
         </article>
       ))}

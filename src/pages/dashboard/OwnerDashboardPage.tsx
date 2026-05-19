@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getMyBookings, getOwnerBookings } from '../../api/bookings'
-import { createOwnerProperty, getOwnerProperties } from '../../api/properties'
+import { getMyBookings, getOwnerBookings, updateBookingStatusRequest } from '../../api/bookings'
+import { createOwnerProperty, createRoomForProperty, getOwnerProperties } from '../../api/properties'
 import {
   getVerificationRequests,
   submitVerificationRequestToApi,
@@ -30,6 +30,13 @@ function OwnerDashboardPage() {
   const [hotelDescription, setHotelDescription] = useState('')
   const [hotelPhotoUrl, setHotelPhotoUrl] = useState('')
   const [verificationComment, setVerificationComment] = useState('')
+  const [selectedHotelId, setSelectedHotelId] = useState<number | null>(null)
+  const [roomName, setRoomName] = useState('')
+  const [roomCapacity, setRoomCapacity] = useState('2')
+  const [roomPricePerUnit, setRoomPricePerUnit] = useState('120')
+  const [roomIsActive, setRoomIsActive] = useState(true)
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null)
+  const [ownerDecisionComment, setOwnerDecisionComment] = useState('')
 
   const { data: ownedHotels = [], isLoading: isLoadingHotels } = useQuery({
     enabled: Boolean(user?.email),
@@ -82,6 +89,38 @@ function OwnerDashboardPage() {
     },
   })
 
+  const createRoomMutation = useMutation({
+    mutationFn: () =>
+      createRoomForProperty(selectedHotelId!, {
+        name: roomName.trim(),
+        capacity: Number(roomCapacity),
+        pricePerUnit: Number(roomPricePerUnit),
+        isActive: roomIsActive,
+      }),
+    onSuccess: () => {
+      setSelectedHotelId(null)
+      setRoomName('')
+      setRoomCapacity('2')
+      setRoomPricePerUnit('120')
+      setRoomIsActive(true)
+      queryClient.invalidateQueries({ queryKey: ['owner-properties', user?.email] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
+    },
+  })
+
+  const bookingDecisionMutation = useMutation({
+    mutationFn: (payload: { bookingId: string; status: 'CONFIRMED' | 'CANCELLED' }) =>
+      updateBookingStatusRequest(payload.bookingId, payload.status),
+    onSuccess: () => {
+      setSelectedBookingId(null)
+      setOwnerDecisionComment('')
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'owner'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'all'] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
+    },
+  })
+
   const avgRating = useMemo(
     () =>
       ownedHotels.length
@@ -98,6 +137,16 @@ function OwnerDashboardPage() {
     createHotelMutation.mutate()
   }
 
+  const selectedBooking = hotelBookings.find((booking) => booking.id === selectedBookingId) ?? null
+
+  const addRoom = () => {
+    if (!selectedHotelId || !roomName.trim()) {
+      return
+    }
+
+    createRoomMutation.mutate()
+  }
+
   const renderBookingCards = (
     bookings: typeof personalBookings,
     emptyLabel: string,
@@ -105,7 +154,12 @@ function OwnerDashboardPage() {
   ) => (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {bookings.map((booking) => (
-        <article key={booking.id} className="rounded-2xl border border-slate-200 p-3">
+        <article
+          key={booking.id}
+          className={`rounded-2xl border p-3 transition ${
+            booking.isInactive ? 'border-slate-200 bg-slate-100/80 opacity-70' : 'border-slate-200 bg-white'
+          }`}
+        >
           <div className="relative overflow-hidden rounded-2xl">
             <img alt={booking.hotelName} className="h-44 w-full object-cover" src={booking.image} />
             <span className="absolute right-0 top-0 rounded-bl-xl bg-primary px-3 py-2 text-xs font-medium text-white">
@@ -118,10 +172,33 @@ function OwnerDashboardPage() {
             <p className="text-base">{formatDateRange(booking.checkIn, booking.checkOut)}</p>
             <p className="text-base">{booking.days} Days</p>
             <p className="text-base">Room: {booking.roomName}</p>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
+              Status: {booking.bookingStatus.replace('_', ' ')}
+            </p>
             {showRenter && booking.renterName ? (
               <p className="text-base text-slate-600">Guest: {booking.renterName}</p>
             ) : null}
             <p className="text-lg font-semibold text-slate-900">Total Payment ${booking.total}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {!booking.isInactive && !showRenter ? (
+                <button
+                  className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-600"
+                  onClick={() => bookingDecisionMutation.mutate({ bookingId: booking.id, status: 'CANCELLED' })}
+                  type="button"
+                >
+                  Cancel Booking
+                </button>
+              ) : null}
+              {!booking.isInactive && showRenter && booking.bookingStatus === 'pending' ? (
+                <button
+                  className="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary"
+                  onClick={() => setSelectedBookingId(booking.id)}
+                  type="button"
+                >
+                  Review Booking
+                </button>
+              ) : null}
+            </div>
           </div>
         </article>
       ))}
@@ -227,6 +304,13 @@ function OwnerDashboardPage() {
             >
               {createHotelMutation.isPending ? 'Adding...' : 'Add Hotel and Send to Verification'}
             </button>
+            {createHotelMutation.error ? (
+              <p className="text-sm font-medium text-rose-600 md:col-span-2">
+                {createHotelMutation.error instanceof Error
+                  ? createHotelMutation.error.message
+                  : 'Unable to create hotel right now.'}
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -257,9 +341,17 @@ function OwnerDashboardPage() {
                       {hotel.verificationStatus}
                     </span>
                   </div>
+                  <p className="text-sm text-slate-500">{hotel.rooms.length} rooms configured</p>
                   <p className="text-sm text-slate-500">
                     Verification is sent automatically when the hotel is created.
                   </p>
+                  <button
+                    className="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary"
+                    onClick={() => setSelectedHotelId(hotel.id)}
+                    type="button"
+                  >
+                    Add Room
+                  </button>
                 </div>
               </article>
             ))}
@@ -368,6 +460,105 @@ function OwnerDashboardPage() {
           </div>
         </main>
       </div>
+
+      {selectedHotelId ? (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-2xl font-semibold text-slate-900">Add Room</h3>
+              <button className="text-sm font-semibold text-slate-500" onClick={() => setSelectedHotelId(null)} type="button">
+                Close
+              </button>
+            </div>
+            <div className="grid gap-3">
+              <input
+                className="h-11 rounded-xl border border-slate-200 px-4 text-base"
+                onChange={(event) => setRoomName(event.target.value)}
+                placeholder="Room name"
+                value={roomName}
+              />
+              <input
+                className="h-11 rounded-xl border border-slate-200 px-4 text-base"
+                min="1"
+                onChange={(event) => setRoomCapacity(event.target.value)}
+                placeholder="Capacity"
+                type="number"
+                value={roomCapacity}
+              />
+              <input
+                className="h-11 rounded-xl border border-slate-200 px-4 text-base"
+                min="1"
+                onChange={(event) => setRoomPricePerUnit(event.target.value)}
+                placeholder="Price per unit"
+                step="0.01"
+                type="number"
+                value={roomPricePerUnit}
+              />
+              <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700">
+                <input checked={roomIsActive} onChange={(event) => setRoomIsActive(event.target.checked)} type="checkbox" />
+                Room is active
+              </label>
+              <button className="h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-white" onClick={addRoom} type="button">
+                {createRoomMutation.isPending ? 'Saving room...' : 'Save Room'}
+              </button>
+              {createRoomMutation.error ? (
+                <p className="text-sm font-medium text-rose-600">
+                  {createRoomMutation.error instanceof Error
+                    ? createRoomMutation.error.message
+                    : 'Unable to save room right now.'}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedBooking ? (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl font-semibold text-slate-900">Review Booking</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedBooking.renterName} requested {selectedBooking.roomName} at {selectedBooking.hotelName}
+                </p>
+              </div>
+              <button
+                className="text-sm font-semibold text-slate-500"
+                onClick={() => {
+                  setSelectedBookingId(null)
+                  setOwnerDecisionComment('')
+                }}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+            <textarea
+              className="min-h-28 w-full rounded-xl border border-slate-200 px-4 py-3 text-base"
+              onChange={(event) => setOwnerDecisionComment(event.target.value)}
+              placeholder="Comment for your decision (UI note, status is stored in DB)"
+              value={ownerDecisionComment}
+            />
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                onClick={() => bookingDecisionMutation.mutate({ bookingId: selectedBooking.id, status: 'CONFIRMED' })}
+                type="button"
+              >
+                Accept Booking
+              </button>
+              <button
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
+                onClick={() => bookingDecisionMutation.mutate({ bookingId: selectedBooking.id, status: 'CANCELLED' })}
+                type="button"
+              >
+                Reject Booking
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -23,6 +23,8 @@ function PaymentPage() {
   const [bank, setBank] = useState('')
   const [expDate, setExpDate] = useState('')
   const [cvv, setCvv] = useState('')
+  const [paymentType, setPaymentType] = useState<'partial' | 'full'>('partial')
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'BANK_TRANSFER' | 'CASH'>('CARD')
 
   const bookingMutation = useMutation({
     mutationFn: async () => {
@@ -31,7 +33,8 @@ function PaymentPage() {
       }
 
       const days = daysBetween(draft.checkIn, draft.checkOut)
-      const initialPayment = Math.round((days * draft.roomPricePerNight) / 2)
+      const totalAmount = days * draft.roomPricePerNight
+      const amountToPay = paymentType === 'full' ? totalAmount : Math.round(totalAmount / 2)
 
       const booking = await createBookingRequest({
         roomId: draft.roomId,
@@ -41,8 +44,8 @@ function PaymentPage() {
 
       await createPaymentRequest({
         bookingId: booking.id,
-        amount: initialPayment,
-        paymentMethod: 'CARD',
+        amount: amountToPay,
+        paymentMethod,
       })
     },
     onSuccess: () => {
@@ -58,11 +61,16 @@ function PaymentPage() {
   const days = daysBetween(draft.checkIn, draft.checkOut)
   const total = days * draft.roomPricePerNight
   const initialPayment = Math.round(total / 2)
+  const amountToPay = paymentType === 'full' ? total : initialPayment
 
   const payNow = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!cardNumber || !bank || !expDate || !cvv) {
+    if (paymentMethod === 'CARD' && (!cardNumber || !expDate || !cvv)) {
+      return
+    }
+
+    if (paymentMethod === 'BANK_TRANSFER' && !bank) {
       return
     }
 
@@ -95,22 +103,39 @@ function PaymentPage() {
 
         <form className="space-y-3 lg:pl-2" onSubmit={payNow}>
           <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+            Payment Type
+            <select
+              className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+              onChange={(event) => setPaymentType(event.target.value as 'partial' | 'full')}
+              value={paymentType}
+            >
+              <option value="partial">Partial payment</option>
+              <option value="full">Full payment</option>
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+            Payment Method
+            <select
+              className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+              onChange={(event) => setPaymentMethod(event.target.value as 'CARD' | 'BANK_TRANSFER' | 'CASH')}
+              value={paymentMethod}
+            >
+              <option value="CARD">Card</option>
+              <option value="BANK_TRANSFER">Bank transfer</option>
+              <option value="CASH">Cash</option>
+            </select>
+          </label>
+
+          {paymentMethod === 'CARD' ? (
+            <>
+          <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
             Card Number
             <input
               className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
               onChange={(event) => setCardNumber(event.target.value)}
               placeholder="Payment card number"
               value={cardNumber}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
-            Bank
-            <input
-              className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
-              onChange={(event) => setBank(event.target.value)}
-              placeholder="Select Bank"
-              value={bank}
             />
           </label>
 
@@ -133,6 +158,31 @@ function PaymentPage() {
               value={cvv}
             />
           </label>
+            </>
+          ) : null}
+
+          {paymentMethod === 'BANK_TRANSFER' ? (
+            <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+              Bank
+              <input
+                className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+                onChange={(event) => setBank(event.target.value)}
+                placeholder="Bank name"
+                value={bank}
+              />
+            </label>
+          ) : null}
+
+          {paymentMethod === 'CASH' ? (
+            <div className="rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-600">
+              Cash payment will be marked in the system and still wait for owner approval.
+            </div>
+          ) : null}
+
+          <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            You are about to pay <span className="font-semibold text-slate-900">${amountToPay}</span> via{' '}
+            <span className="font-semibold text-slate-900">{paymentMethod.replace('_', ' ').toLowerCase()}</span>.
+          </div>
 
           <button
             className="mt-5 h-11 w-full rounded-2xl bg-primary text-base font-semibold text-white md:text-lg"
