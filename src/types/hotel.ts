@@ -23,6 +23,13 @@ export type Hotel = {
   description: string
   amenities: string[]
   rooms: HotelRoom[]
+  reviewItems?: Array<{
+    id: number
+    rating: number
+    comment: string
+    authorName: string
+    createdAt?: string
+  }>
 }
 
 export type HighlightCard = {

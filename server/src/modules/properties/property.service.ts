@@ -278,8 +278,16 @@ export const getPropertyById = async (propertyId: number) => {
         orderBy: { pricePerUnit: 'asc' },
       },
       reviews: {
-        select: {
-          rating: true,
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
         },
       },
     },
@@ -290,6 +298,79 @@ export const getPropertyById = async (propertyId: number) => {
   }
 
   return property
+}
+
+export const createPropertyReview = async (
+  propertyId: number,
+  userId: number,
+  input: {
+    rating: number
+    comment?: string
+  },
+) => {
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+  })
+
+  if (!property) {
+    throw new HttpError(404, 'Property not found')
+  }
+
+  const existingReview = await prisma.review.findFirst({
+    where: {
+      propertyId,
+      userId,
+    },
+  })
+
+  const review = existingReview
+    ? await prisma.review.update({
+        where: { id: existingReview.id },
+        data: {
+          rating: input.rating,
+          comment: input.comment,
+        },
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      })
+    : await prisma.review.create({
+        data: {
+          propertyId,
+          userId,
+          rating: input.rating,
+          comment: input.comment,
+        },
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      })
+
+  const aggregate = await prisma.review.aggregate({
+    where: { propertyId },
+    _avg: {
+      rating: true,
+    },
+  })
+
+  await prisma.property.update({
+    where: { id: propertyId },
+    data: {
+      rating: aggregate._avg.rating ?? undefined,
+    },
+  })
+
+  return review
 }
 
 export const getAvailableRooms = async (

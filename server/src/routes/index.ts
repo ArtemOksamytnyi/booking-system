@@ -3,6 +3,7 @@ import { authRouter } from '../modules/auth/auth.routes'
 import { bookingRouter } from '../modules/bookings/booking.routes'
 import { paymentRouter } from '../modules/payments/payment.routes'
 import { propertyRouter } from '../modules/properties/property.routes'
+import { reminderRouter } from '../modules/reminders/reminder.routes'
 import { userRouter } from '../modules/users/user.routes'
 import { verificationRouter } from '../modules/verification/verification.routes'
 
@@ -20,6 +21,7 @@ apiRouter.use('/auth', authRouter)
 apiRouter.use('/properties', propertyRouter)
 apiRouter.use('/bookings', bookingRouter)
 apiRouter.use('/payments', paymentRouter)
+apiRouter.use('/reminders', reminderRouter)
 apiRouter.use('/verification-requests', verificationRouter)
 apiRouter.use('/users', userRouter)
 

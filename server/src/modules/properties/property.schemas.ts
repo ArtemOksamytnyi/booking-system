@@ -33,6 +33,14 @@ export const createRoomSchema = z.object({
   isActive: z.boolean().default(true),
 })
 
+export const createReviewSchema = z.object({
+  rating: z.coerce.number().int().min(1).max(5),
+  comment: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().trim().max(1000).optional(),
+  ),
+})
+
 export const listPropertiesSchema = z.object({
   search: z.string().trim().optional(),
   category: z.string().trim().optional(),

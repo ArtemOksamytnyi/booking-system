@@ -78,6 +78,13 @@ export const createBooking = async (
       ownerIncome: totals.ownerIncome,
       bookingStatus: BookingStatus.PENDING,
       paymentStatus: PaymentStatus.PENDING,
+      reminders: {
+        create: {
+          userId: renterId,
+          remindAt: new Date(input.endDatetime.getTime() - 24 * 60 * 60 * 1000),
+          isSent: false,
+        },
+      },
     },
     include: {
       room: {
@@ -85,6 +92,7 @@ export const createBooking = async (
           property: true,
         },
       },
+      reminders: true,
     },
   })
 }

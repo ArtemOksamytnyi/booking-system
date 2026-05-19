@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAllBookings, getMyBookings, updateBookingStatusRequest } from '../../api/bookings'
+import { getMyReminders } from '../../api/reminders'
 import { getUsers } from '../../api/users'
 import {
   getVerificationRequests,
@@ -16,6 +17,7 @@ const tabItems: Array<{ id: AdminDashboardTab; label: string }> = [
   { id: 'users', label: 'Users' },
   { id: 'owners', label: 'Hotel Owners' },
   { id: 'bookings', label: 'Booking Details' },
+  { id: 'reminders', label: 'Reminders' },
   { id: 'refunds', label: 'Refund' },
   { id: 'messages', label: 'Message' },
   { id: 'help', label: 'Help' },
@@ -54,6 +56,12 @@ function AdminDashboardPage() {
     enabled: Boolean(user?.role === 'admin'),
     queryKey: ['dashboard-bookings', 'all'],
     queryFn: getAllBookings,
+  })
+
+  const { data: reminders = [] } = useQuery({
+    enabled: Boolean(user),
+    queryKey: ['dashboard-reminders', 'me'],
+    queryFn: getMyReminders,
   })
 
   const filteredUsers = useMemo(
@@ -353,6 +361,29 @@ function AdminDashboardPage() {
         <div className="space-y-4">
           <p className="text-slate-600">All bookings from the database are listed below.</p>
           {renderBookingCards(allBookings, 'No bookings in the system yet.', true)}
+        </div>
+      )
+    }
+
+    if (activeTab === 'reminders') {
+      return (
+        <div className="space-y-3">
+          {reminders.map((reminder) => (
+            <article key={reminder.id} className="rounded-xl border border-slate-200 p-4">
+              <p className="font-semibold text-slate-900">{reminder.hotelName}</p>
+              <p className="text-sm text-slate-500">{reminder.location}</p>
+              <p className="mt-2 text-sm text-slate-600">
+                Room: {reminder.roomName} · Checkout: {reminder.checkOut}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Reminder time: {new Date(reminder.remindAt).toLocaleString('en-GB')}
+              </p>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {reminder.isSent ? 'Reminder is active' : 'Upcoming reminder'}
+              </p>
+            </article>
+          ))}
+          {reminders.length === 0 ? <p className="text-slate-500">No reminders yet.</p> : null}
         </div>
       )
     }

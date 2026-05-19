@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { getAvailableRooms, getProperties, getPropertyById, getPropertyIdFromSlug } from '../api/properties'
+import { createPropertyReview, getAvailableRooms, getProperties, getPropertyById, getPropertyIdFromSlug } from '../api/properties'
+import { useAuth } from '../context/AuthContext'
 import { useBooking } from '../context/BookingContext'
 import type { Hotel } from '../types/hotel'
 
@@ -23,11 +24,15 @@ type HotelDetailsContentProps = {
 
 function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
   const { startDraft } = useBooking()
   const [checkIn, setCheckIn] = useState(getDateOffset(1))
   const [checkOut, setCheckOut] = useState(getDateOffset(3))
   const [guests, setGuests] = useState(2)
   const [isRoomsModalOpen, setIsRoomsModalOpen] = useState(false)
+  const [reviewRating, setReviewRating] = useState('5')
+  const [reviewComment, setReviewComment] = useState('')
   const { data: allHotels = [] } = useQuery({
     queryKey: ['properties', 'details-similar'],
     queryFn: () => getProperties(),
@@ -48,6 +53,19 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
   }, [checkIn, checkOut])
 
   const total = days * hotel.pricePerNight
+
+  const reviewMutation = useMutation({
+    mutationFn: () =>
+      createPropertyReview(hotel.id, {
+        rating: Number(reviewRating),
+        comment: reviewComment.trim() || undefined,
+      }),
+    onSuccess: async () => {
+      setReviewComment('')
+      setReviewRating('5')
+      await queryClient.invalidateQueries({ queryKey: ['property', hotel.id] })
+    },
+  })
 
   const onOpenRooms = () => {
     setIsRoomsModalOpen(true)
@@ -74,6 +92,15 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
     })
     setIsRoomsModalOpen(false)
     navigate(`/booking/${hotel.slug}`)
+  }
+
+  const onSubmitReview = async () => {
+    if (!user) {
+      navigate('/hotels')
+      return
+    }
+
+    await reviewMutation.mutateAsync()
   }
 
   return (
@@ -190,6 +217,75 @@ function HotelDetailsContent({ hotel }: HotelDetailsContentProps) {
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               <p>{hotel.description}</p>
             </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
+        <article className="rounded-3xl bg-white p-7 shadow-sm shadow-slate-200">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-3xl font-semibold text-slate-900">Guest Reviews</h2>
+            <span className="text-sm text-slate-500">{hotel.reviewItems?.length ?? 0} entries</span>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {(hotel.reviewItems?.length ?? 0) > 0 ? (
+              hotel.reviewItems?.map((review) => (
+                <article key={review.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="font-semibold text-slate-900">{review.authorName}</p>
+                    <span className="text-sm font-semibold text-amber-500">★ {review.rating}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">{review.comment || 'No comment left.'}</p>
+                </article>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-slate-500">
+                No reviews yet. Be the first guest to leave feedback.
+              </div>
+            )}
+          </div>
+        </article>
+
+        <article className="rounded-3xl bg-white p-7 shadow-sm shadow-slate-200">
+          <h2 className="text-3xl font-semibold text-slate-900">Leave a Review</h2>
+          <div className="mt-5 space-y-4">
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rating</span>
+              <select
+                className="h-11 rounded-xl border border-slate-200 px-4 outline-none focus:border-primary"
+                onChange={(event) => setReviewRating(event.target.value)}
+                value={reviewRating}
+              >
+                {[5, 4, 3, 2, 1].map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Comment</span>
+              <textarea
+                className="min-h-32 rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-primary"
+                onChange={(event) => setReviewComment(event.target.value)}
+                placeholder="Share a few words about the stay..."
+                value={reviewComment}
+              />
+            </label>
+
+            {user ? (
+              <button
+                className="h-12 w-full rounded-xl bg-primary text-sm font-semibold text-white transition hover:bg-blue-700"
+                onClick={() => void onSubmitReview()}
+                type="button"
+              >
+                {reviewMutation.isPending ? 'Saving review...' : 'Submit Review'}
+              </button>
+            ) : (
+              <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Login to leave a review for this hotel.
+              </p>
+            )}
           </div>
         </article>
       </section>

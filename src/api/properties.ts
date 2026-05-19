@@ -20,7 +20,14 @@ type ApiProperty = {
     isActive: boolean
   }>
   reviews?: Array<{
+    id?: number
     rating: number
+    comment?: string | null
+    createdAt?: string
+    user?: {
+      firstName: string
+      lastName: string
+    }
   }>
 }
 
@@ -105,6 +112,16 @@ export const mapPropertyToHotel = (property: ApiProperty): Hotel => {
     description: property.description ?? 'No description provided yet.',
     amenities: [],
     rooms,
+    reviewItems:
+      property.reviews?.map((review, index) => ({
+        id: review.id ?? index,
+        rating: review.rating,
+        comment: review.comment ?? '',
+        authorName: review.user
+          ? `${review.user.firstName} ${review.user.lastName}`.trim()
+          : 'Guest',
+        createdAt: review.createdAt,
+      })) ?? [],
   }
 }
 
@@ -224,3 +241,15 @@ export const getAvailableRooms = async (
     rooms: response.rooms.map(mapRoom),
   }
 }
+
+export const createPropertyReview = async (
+  propertyId: number,
+  payload: {
+    rating: number
+    comment?: string
+  },
+) =>
+  apiFetch(`/properties/${propertyId}/reviews`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })

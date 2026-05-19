@@ -427,7 +427,7 @@ async function seedBookingsAndPayments(
       await prisma.reminder.update({
         where: { id: existingReminder.id },
         data: {
-          remindAt: new Date(startDatetime.getTime() - 24 * 60 * 60 * 1000),
+          remindAt: new Date(endDatetime.getTime() - 24 * 60 * 60 * 1000),
           isSent: bookingStatus === BookingStatus.COMPLETED,
         },
       })
@@ -436,7 +436,7 @@ async function seedBookingsAndPayments(
         data: {
           bookingId: booking.id,
           userId: renter.id,
-          remindAt: new Date(startDatetime.getTime() - 24 * 60 * 60 * 1000),
+          remindAt: new Date(endDatetime.getTime() - 24 * 60 * 60 * 1000),
           isSent: bookingStatus === BookingStatus.COMPLETED,
         },
       })

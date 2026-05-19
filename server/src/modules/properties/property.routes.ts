@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../../middleware/auth'
 import { asyncHandler } from '../../utils/async-handler'
 import {
+  createReviewSchema,
   createRoomSchema,
   createOwnerPropertySchema,
   createPropertySchema,
@@ -10,6 +11,7 @@ import {
   reviewPropertyVerificationSchema,
 } from './property.schemas'
 import {
+  createPropertyReview,
   createProperty,
   createPropertyForOwner,
   createRoomForOwner,
@@ -107,6 +109,21 @@ propertyRouter.get(
     )
 
     res.json(result)
+  }),
+)
+
+propertyRouter.post(
+  '/:id/reviews',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const input = createReviewSchema.parse(req.body)
+    const review = await createPropertyReview(
+      Number(req.params.id),
+      (req as AuthenticatedRequest).user!.userId,
+      input,
+    )
+
+    res.status(201).json(review)
   }),
 )
 
