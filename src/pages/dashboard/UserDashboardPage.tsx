@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMyBookings, updateBookingStatusRequest } from '../../api/bookings'
+import { createPaymentRequest } from '../../api/payments'
 import { getMyReminders } from '../../api/reminders'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateRange } from '../../context/BookingContext'
@@ -41,6 +42,18 @@ function UserDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'owner'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'all'] })
       queryClient.invalidateQueries({ queryKey: ['properties'] })
+    },
+  })
+
+  const topUpMutation = useMutation({
+    mutationFn: (booking: (typeof bookings)[number]) =>
+      createPaymentRequest({
+        bookingId: Number(booking.id),
+        amount: booking.remainingAmount,
+        paymentMethod: 'CARD',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
     },
   })
 
@@ -92,6 +105,21 @@ function UserDashboardPage() {
                 <p className="text-lg">Guests: {booking.guests}</p>
                 <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
                   Status: {booking.bookingStatus.replace('_', ' ')}
+                </p>
+                <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-500">
+                  <span>Payment: {booking.paymentStatus.replace('_', ' ')}</span>
+                  {booking.paymentStatus === 'partially_paid' && booking.remainingAmount > 0 && !booking.isInactive ? (
+                    <button
+                      className="rounded-full border border-primary px-2 py-1 text-[11px] font-semibold text-primary"
+                      onClick={() => topUpMutation.mutate(booking)}
+                      type="button"
+                    >
+                      Pay remaining ${booking.remainingAmount}
+                    </button>
+                  ) : null}
+                </div>
+                <p className="text-sm text-slate-500">
+                  Paid ${booking.paidAmount} · Remaining ${booking.remainingAmount}
                 </p>
                 <p className="text-lg">Initial Payment ${booking.initialPayment}</p>
                 <p className="text-xl font-semibold text-slate-900">Total Payment ${booking.total}</p>

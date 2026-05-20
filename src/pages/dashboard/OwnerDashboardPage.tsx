@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMyBookings, getOwnerBookings, updateBookingStatusRequest } from '../../api/bookings'
+import { createPaymentRequest } from '../../api/payments'
 import { createOwnerProperty, createRoomForProperty, getOwnerProperties, getPropertyTypes } from '../../api/properties'
 import { getMyReminders } from '../../api/reminders'
 import {
@@ -133,6 +134,18 @@ function OwnerDashboardPage() {
     },
   })
 
+  const topUpMutation = useMutation({
+    mutationFn: (booking: (typeof personalBookings)[number]) =>
+      createPaymentRequest({
+        bookingId: Number(booking.id),
+        amount: booking.remainingAmount,
+        paymentMethod: 'CARD',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
+    },
+  })
+
   const avgRating = useMemo(
     () =>
       ownedHotels.length
@@ -187,6 +200,23 @@ function OwnerDashboardPage() {
             <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
               Status: {booking.bookingStatus.replace('_', ' ')}
             </p>
+            <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-slate-500">
+              <span>Payment: {booking.paymentStatus.replace('_', ' ')}</span>
+              {!showRenter && booking.paymentStatus === 'partially_paid' && booking.remainingAmount > 0 && !booking.isInactive ? (
+                <button
+                  className="rounded-full border border-primary px-2 py-1 text-[11px] font-semibold text-primary"
+                  onClick={() => topUpMutation.mutate(booking)}
+                  type="button"
+                >
+                  Pay remaining ${booking.remainingAmount}
+                </button>
+              ) : null}
+            </div>
+            {!showRenter ? (
+              <p className="text-sm text-slate-500">
+                Paid ${booking.paidAmount} · Remaining ${booking.remainingAmount}
+              </p>
+            ) : null}
             {showRenter && booking.renterName ? (
               <p className="text-base text-slate-600">Guest: {booking.renterName}</p>
             ) : null}

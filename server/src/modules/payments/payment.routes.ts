@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { requireAuth } from '../../middleware/auth'
+import { requireAuth, type AuthenticatedRequest } from '../../middleware/auth'
 import { asyncHandler } from '../../utils/async-handler'
 import { createPaymentSchema } from './payment.schemas'
 import { createPayment } from './payment.service'
@@ -12,7 +12,7 @@ paymentRouter.post(
   '/',
   asyncHandler(async (req, res) => {
     const input = createPaymentSchema.parse(req.body)
-    const payment = await createPayment(input)
+    const payment = await createPayment((req as AuthenticatedRequest).user!, input)
     res.status(201).json(payment)
   }),
 )

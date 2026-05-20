@@ -11,6 +11,11 @@ type ApiBooking = {
   bookingStatus: string
   paymentStatus: string
   createdAt: string
+  payments: Array<{
+    id: number
+    amount: string | number
+    paymentStatus: string
+  }>
   room: {
     id: number
     name: string
@@ -51,6 +56,8 @@ export type DashboardBooking = {
   bookingStatus: 'pending' | 'confirmed' | 'cancelled' | 'completed'
   paymentStatus: 'pending' | 'partially_paid' | 'paid' | 'failed' | 'refunded'
   isInactive: boolean
+  paidAmount: number
+  remainingAmount: number
   renterName?: string
   renterEmail?: string
 }
@@ -73,6 +80,8 @@ const mapBooking = (booking: ApiBooking): DashboardBooking => {
   const checkOut = booking.endDatetime.slice(0, 10)
   const days = daysBetween(checkIn, checkOut)
   const total = Number(booking.totalPrice)
+  const paidAmount = booking.payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+  const remainingAmount = Math.max(total - paidAmount, 0)
 
   return {
     id: String(booking.id),
@@ -96,6 +105,8 @@ const mapBooking = (booking: ApiBooking): DashboardBooking => {
     bookingStatus: booking.bookingStatus.toLowerCase() as DashboardBooking['bookingStatus'],
     paymentStatus: booking.paymentStatus.toLowerCase() as DashboardBooking['paymentStatus'],
     isInactive: ['completed', 'cancelled'].includes(booking.bookingStatus.toLowerCase()),
+    paidAmount,
+    remainingAmount,
     renterName: booking.renter ? `${booking.renter.firstName} ${booking.renter.lastName}`.trim() : undefined,
     renterEmail: booking.renter?.email,
   }
