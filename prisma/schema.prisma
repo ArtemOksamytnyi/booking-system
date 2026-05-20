@@ -81,6 +81,7 @@ model Property {
   description        String?
   rating             Decimal?              @db.Decimal(3, 2)
   photoUrl           String?               @map("photo_url") @db.VarChar(255)
+  isActive           Boolean               @default(true) @map("is_active")
   verificationStatus VerificationStatus    @default(PENDING) @map("verification_status")
   createdAt          DateTime              @default(now()) @map("created_at")
   owner              User                  @relation("PropertyOwner", fields: [ownerId], references: [id], onDelete: Restrict)

@@ -8,6 +8,7 @@ type ApiProperty = {
   description: string | null
   rating: string | number | null
   photoUrl: string | null
+  isActive?: boolean
   verificationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED'
   propertyType: {
     name: PropertyCategory
@@ -59,6 +60,7 @@ export type PropertyFilters = {
 
 export type OwnerProperty = Hotel & {
   verificationStatus: 'pending' | 'approved' | 'rejected'
+  isActive: boolean
 }
 
 type ApiPropertyType = {
@@ -132,6 +134,7 @@ export const mapPropertyToHotel = (property: ApiProperty): Hotel => {
 
 export const mapPropertyToOwnerHotel = (property: ApiProperty): OwnerProperty => ({
   ...mapPropertyToHotel(property),
+  isActive: property.isActive ?? true,
   verificationStatus: (property.verificationStatus ?? 'PENDING').toLowerCase() as OwnerProperty['verificationStatus'],
 })
 
@@ -219,6 +222,59 @@ export const createRoomForProperty = async (
   apiFetch(`/properties/${propertyId}/rooms`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  })
+
+export const updateOwnerProperty = async (
+  propertyId: number,
+  payload: {
+    name: string
+    address: string
+    description?: string
+    photoUrl?: string
+    propertyTypeName?: string
+  },
+) => {
+  const property = await apiFetch<ApiProperty>(`/properties/owner/${propertyId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      ...payload,
+      propertyTypeName: payload.propertyTypeName ?? 'hotel',
+    }),
+  })
+
+  return mapPropertyToOwnerHotel(property)
+}
+
+export const removeOrDeactivateOwnerProperty = async (
+  propertyId: number,
+  action: 'delete' | 'deactivate' | 'cancel_pending',
+) =>
+  apiFetch(`/properties/owner/${propertyId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ action }),
+  })
+
+export const updateRoomForProperty = async (
+  roomId: number,
+  payload: {
+    name: string
+    capacity: number
+    pricePerUnit: number
+    isActive: boolean
+  },
+) =>
+  apiFetch(`/properties/rooms/${roomId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+
+export const removeOrDeactivateRoomForProperty = async (
+  roomId: number,
+  action: 'delete' | 'deactivate' | 'cancel_pending',
+) =>
+  apiFetch(`/properties/rooms/${roomId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ action }),
   })
 
 export const reviewPropertyVerificationStatus = async (payload: {

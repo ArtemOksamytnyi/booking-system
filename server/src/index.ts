@@ -1,10 +1,11 @@
 import { app } from './app'
 import { env } from './config/env'
-import { syncExpiredBookings } from './modules/bookings/booking.service'
+import { syncBookingPaymentAutomation, syncExpiredBookings } from './modules/bookings/booking.service'
 import { syncDueReminders } from './modules/reminders/reminder.service'
 
 async function startServer() {
   await syncExpiredBookings()
+  await syncBookingPaymentAutomation()
   await syncDueReminders()
 
   app.listen(env.PORT, () => {

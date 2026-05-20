@@ -24,6 +24,18 @@ export type AdminUserDto = {
   createdAt: string
 }
 
+export type OwnerAnalyticsDto = {
+  totalIncome: number
+  averageRating: number
+  isSuperHost: boolean
+  topOwners: Array<{
+    ownerId: number
+    name: string
+    totalIncome: number
+    averageRating: number
+  }>
+}
+
 const mapUser = (user: ApiUser): AdminUserDto => ({
   id: String(user.id),
   name: `${user.firstName} ${user.lastName}`.trim(),
@@ -38,3 +50,5 @@ export const getUsers = async () => {
   const users = await apiFetch<ApiUser[]>('/users')
   return users.map(mapUser)
 }
+
+export const getMyOwnerAnalytics = () => apiFetch<OwnerAnalyticsDto>('/users/me/owner-analytics')

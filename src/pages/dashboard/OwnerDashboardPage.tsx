@@ -2,12 +2,22 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMyBookings, getOwnerBookings, updateBookingStatusRequest } from '../../api/bookings'
 import { createPaymentRequest } from '../../api/payments'
-import { createOwnerProperty, createRoomForProperty, getOwnerProperties, getPropertyTypes } from '../../api/properties'
+import {
+  createOwnerProperty,
+  createRoomForProperty,
+  getOwnerProperties,
+  getPropertyTypes,
+  removeOrDeactivateOwnerProperty,
+  removeOrDeactivateRoomForProperty,
+  updateOwnerProperty,
+  updateRoomForProperty,
+} from '../../api/properties'
 import { getMyReminders } from '../../api/reminders'
 import {
   getVerificationRequests,
   submitVerificationRequestToApi,
 } from '../../api/verification'
+import { getMyOwnerAnalytics } from '../../api/users'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateRange } from '../../context/BookingContext'
 import { useUiStore } from '../../store/uiStore'
@@ -34,10 +44,12 @@ function OwnerDashboardPage() {
   const [hotelPhotoUrl, setHotelPhotoUrl] = useState('')
   const [verificationComment, setVerificationComment] = useState('')
   const [selectedHotelId, setSelectedHotelId] = useState<number | null>(null)
+  const [editingHotelId, setEditingHotelId] = useState<number | null>(null)
   const [roomName, setRoomName] = useState('')
   const [roomCapacity, setRoomCapacity] = useState('2')
   const [roomPricePerUnit, setRoomPricePerUnit] = useState('120')
   const [roomIsActive, setRoomIsActive] = useState(true)
+  const [editingRoomId, setEditingRoomId] = useState<number | null>(null)
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null)
   const [ownerDecisionComment, setOwnerDecisionComment] = useState('')
 
@@ -74,50 +86,93 @@ function OwnerDashboardPage() {
     queryKey: ['dashboard-reminders', 'me'],
     queryFn: getMyReminders,
   })
+  const { data: ownerAnalytics } = useQuery({
+    enabled: Boolean(user?.role === 'hotel_owner'),
+    queryKey: ['owner-analytics', user?.id],
+    queryFn: getMyOwnerAnalytics,
+  })
 
   const createHotelMutation = useMutation({
-    mutationFn: () =>
-      createOwnerProperty({
+    mutationFn: () => {
+      const payload = {
         name: hotelName.trim(),
         address: hotelLocation.trim(),
         description: hotelDescription.trim() || undefined,
         photoUrl: hotelPhotoUrl.trim() || undefined,
         propertyTypeName: hotelType,
-      }),
+      }
+
+      return editingHotelId
+        ? updateOwnerProperty(editingHotelId, payload)
+        : createOwnerProperty(payload)
+    },
     onSuccess: async (property) => {
-      await submitVerificationRequestToApi({
-        propertyId: property.id,
-        comment: verificationComment.trim() || undefined,
-      })
+      if (!editingHotelId) {
+        await submitVerificationRequestToApi({
+          propertyId: property.id,
+          comment: verificationComment.trim() || undefined,
+        })
+      }
       setHotelName('')
       setHotelLocation('')
       setHotelType('hotel')
       setHotelDescription('')
       setHotelPhotoUrl('')
       setVerificationComment('')
+      setEditingHotelId(null)
       queryClient.invalidateQueries({ queryKey: ['owner-properties', user?.email] })
       queryClient.invalidateQueries({ queryKey: ['properties'] })
       queryClient.invalidateQueries({ queryKey: ['verification-requests', 'owner'] })
       queryClient.invalidateQueries({ queryKey: ['verification-requests', 'admin'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-analytics', user?.id] })
     },
   })
 
   const createRoomMutation = useMutation({
-    mutationFn: () =>
-      createRoomForProperty(selectedHotelId!, {
+    mutationFn: () => {
+      const payload = {
         name: roomName.trim(),
         capacity: Number(roomCapacity),
         pricePerUnit: Number(roomPricePerUnit),
         isActive: roomIsActive,
-      }),
+      }
+
+      return editingRoomId
+        ? updateRoomForProperty(editingRoomId, payload)
+        : createRoomForProperty(selectedHotelId!, payload)
+    },
     onSuccess: () => {
       setSelectedHotelId(null)
+      setEditingRoomId(null)
       setRoomName('')
       setRoomCapacity('2')
       setRoomPricePerUnit('120')
       setRoomIsActive(true)
       queryClient.invalidateQueries({ queryKey: ['owner-properties', user?.email] })
       queryClient.invalidateQueries({ queryKey: ['properties'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-analytics', user?.id] })
+    },
+  })
+
+  const removeHotelMutation = useMutation({
+    mutationFn: (payload: { propertyId: number; action: 'delete' | 'deactivate' | 'cancel_pending' }) =>
+      removeOrDeactivateOwnerProperty(payload.propertyId, payload.action),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-properties', user?.email] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'owner'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-analytics', user?.id] })
+    },
+  })
+
+  const removeRoomMutation = useMutation({
+    mutationFn: (payload: { roomId: number; action: 'delete' | 'deactivate' | 'cancel_pending' }) =>
+      removeOrDeactivateRoomForProperty(payload.roomId, payload.action),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-properties', user?.email] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'owner'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-analytics', user?.id] })
     },
   })
 
@@ -131,6 +186,7 @@ function OwnerDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'all'] })
       queryClient.invalidateQueries({ queryKey: ['properties'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-analytics', user?.id] })
     },
   })
 
@@ -162,6 +218,16 @@ function OwnerDashboardPage() {
     createHotelMutation.mutate()
   }
 
+  const editHotel = (hotel: (typeof ownedHotels)[number]) => {
+    setEditingHotelId(hotel.id)
+    setHotelName(hotel.name)
+    setHotelLocation(hotel.location)
+    setHotelType(hotel.category)
+    setHotelDescription(hotel.description)
+    setHotelPhotoUrl(hotel.image)
+    setVerificationComment('')
+  }
+
   const selectedBooking = hotelBookings.find((booking) => booking.id === selectedBookingId) ?? null
 
   const addRoom = () => {
@@ -170,6 +236,43 @@ function OwnerDashboardPage() {
     }
 
     createRoomMutation.mutate()
+  }
+
+  const editRoom = (hotelId: number, room: (typeof ownedHotels)[number]['rooms'][number]) => {
+    setSelectedHotelId(hotelId)
+    setEditingRoomId(room.id)
+    setRoomName(room.name)
+    setRoomCapacity(String(room.capacity))
+    setRoomPricePerUnit(String(room.pricePerNight))
+    setRoomIsActive(room.isActive)
+  }
+
+  const askPropertyAction = (propertyId: number) => {
+    const action = window.prompt('Type one action: delete, deactivate, cancel_pending')
+    if (action === 'delete' || action === 'deactivate' || action === 'cancel_pending') {
+      removeHotelMutation.mutate(
+        { propertyId, action },
+        {
+          onError: (error) => {
+            window.alert(error instanceof Error ? error.message : 'Unable to manage this hotel.')
+          },
+        },
+      )
+    }
+  }
+
+  const askRoomAction = (roomId: number) => {
+    const action = window.prompt('Type one action: delete, deactivate, cancel_pending')
+    if (action === 'delete' || action === 'deactivate' || action === 'cancel_pending') {
+      removeRoomMutation.mutate(
+        { roomId, action },
+        {
+          onError: (error) => {
+            window.alert(error instanceof Error ? error.message : 'Unable to manage this room.')
+          },
+        },
+      )
+    }
   }
 
   const renderBookingCards = (
@@ -263,7 +366,7 @@ function OwnerDashboardPage() {
             </article>
             <article className="rounded-2xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Average Rating</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">{avgRating}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{ownerAnalytics?.averageRating ?? avgRating}</p>
             </article>
             <article className="rounded-2xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Pending Requests</p>
@@ -275,6 +378,21 @@ function OwnerDashboardPage() {
               <p className="text-sm text-slate-500">Hotel Bookings</p>
               <p className="mt-2 text-3xl font-semibold text-slate-900">{hotelBookings.length}</p>
             </article>
+          </div>
+          <div className="rounded-2xl bg-blue-50 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-lg font-semibold text-slate-900">
+                Total owner income: ${ownerAnalytics?.totalIncome?.toFixed?.(2) ?? '0.00'}
+              </p>
+              {ownerAnalytics?.isSuperHost ? (
+                <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold text-amber-900">
+                  Супергосподар
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              Owners with income above $1000 are tracked for platform recommendations.
+            </p>
           </div>
           <div>
             <h3 className="mb-3 text-2xl font-semibold text-slate-900">My travel bookings</h3>
@@ -343,8 +461,29 @@ function OwnerDashboardPage() {
               onClick={addHotel}
               type="button"
             >
-              {createHotelMutation.isPending ? 'Adding...' : 'Add Hotel and Send to Verification'}
+              {createHotelMutation.isPending
+                ? 'Saving...'
+                : editingHotelId
+                  ? 'Save Hotel Changes'
+                  : 'Add Hotel and Send to Verification'}
             </button>
+            {editingHotelId ? (
+              <button
+                className="h-11 rounded-xl border border-slate-300 px-5 text-sm font-semibold text-slate-700 md:col-span-2"
+                onClick={() => {
+                  setEditingHotelId(null)
+                  setHotelName('')
+                  setHotelLocation('')
+                  setHotelType(propertyTypes[0] ?? 'hotel')
+                  setHotelDescription('')
+                  setHotelPhotoUrl('')
+                  setVerificationComment('')
+                }}
+                type="button"
+              >
+                Cancel Editing
+              </button>
+            ) : null}
             {createHotelMutation.error ? (
               <p className="text-sm font-medium text-rose-600 md:col-span-2">
                 {createHotelMutation.error instanceof Error
@@ -382,17 +521,72 @@ function OwnerDashboardPage() {
                       {hotel.verificationStatus}
                     </span>
                   </div>
+                  {!hotel.isActive ? (
+                    <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">
+                      inactive
+                    </span>
+                  ) : null}
                   <p className="text-sm text-slate-500">{hotel.rooms.length} rooms configured</p>
                   <p className="text-sm text-slate-500">
                     Verification is sent automatically when the hotel is created.
                   </p>
-                  <button
-                    className="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary"
-                    onClick={() => setSelectedHotelId(hotel.id)}
-                    type="button"
-                  >
-                    Add Room
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary"
+                      onClick={() => setSelectedHotelId(hotel.id)}
+                      type="button"
+                    >
+                      Add Room
+                    </button>
+                    <button
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+                      onClick={() => editHotel(hotel)}
+                      type="button"
+                    >
+                      Edit Hotel
+                    </button>
+                    <button
+                      className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-600"
+                      onClick={() => askPropertyAction(hotel.id)}
+                      type="button"
+                    >
+                      Remove / Deactivate
+                    </button>
+                  </div>
+                  {hotel.rooms.length > 0 ? (
+                    <div className="space-y-2 pt-2">
+                      {hotel.rooms.map((room) => (
+                        <div key={room.id} className="rounded-xl bg-slate-50 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                {room.name} · ${room.pricePerNight}
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                Capacity {room.capacity} · {room.isActive ? 'active' : 'inactive'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+                                onClick={() => editRoom(hotel.id, room)}
+                                type="button"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-600"
+                                onClick={() => askRoomAction(room.id)}
+                                type="button"
+                              >
+                                Remove / Deactivate
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </article>
             ))}
@@ -506,13 +700,22 @@ function OwnerDashboardPage() {
         <main className="space-y-6 px-6 py-7 md:px-8">
           <div className="flex items-start justify-between gap-6">
             <div>
-              <p className="text-3xl font-semibold text-slate-900">Hello, {user?.name || 'Owner'}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-3xl font-semibold text-slate-900">Hello, {user?.name || 'Owner'}</p>
+                {ownerAnalytics?.isSuperHost ? (
+                  <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold text-amber-900">
+                    Супергосподар
+                  </span>
+                ) : null}
+              </div>
               <p className="text-base text-slate-500">Have a nice day</p>
               <h1 className="mt-3 text-5xl font-semibold text-primary">Hotel Owner Dashboard</h1>
             </div>
             <div className="text-right">
               <p className="text-xl font-semibold text-slate-900">{user?.name || 'Owner'}</p>
-              <p className="text-base text-slate-500">Hotel Owner</p>
+              <p className="text-base text-slate-500">
+                Hotel Owner{ownerAnalytics?.isSuperHost ? ' · Супергосподар' : ''}
+              </p>
             </div>
           </div>
 
@@ -527,9 +730,11 @@ function OwnerDashboardPage() {
 
       {selectedHotelId ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/45 p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+              <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-2xl font-semibold text-slate-900">Add Room</h3>
+              <h3 className="text-2xl font-semibold text-slate-900">
+                {editingRoomId ? 'Edit Room' : 'Add Room'}
+              </h3>
               <button className="text-sm font-semibold text-slate-500" onClick={() => setSelectedHotelId(null)} type="button">
                 Close
               </button>
@@ -563,7 +768,11 @@ function OwnerDashboardPage() {
                 Room is active
               </label>
               <button className="h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-white" onClick={addRoom} type="button">
-                {createRoomMutation.isPending ? 'Saving room...' : 'Save Room'}
+                {createRoomMutation.isPending
+                  ? 'Saving room...'
+                  : editingRoomId
+                    ? 'Save Room Changes'
+                    : 'Save Room'}
               </button>
               {createRoomMutation.error ? (
                 <p className="text-sm font-medium text-rose-600">

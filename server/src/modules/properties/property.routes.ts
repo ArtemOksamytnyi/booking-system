@@ -7,6 +7,7 @@ import {
   createOwnerPropertySchema,
   createPropertySchema,
   listPropertiesSchema,
+  ownerPropertyMutationSchema,
   propertyAvailabilitySchema,
   reviewPropertyVerificationSchema,
 } from './property.schemas'
@@ -19,7 +20,11 @@ import {
   getPropertyById,
   listPropertyTypes,
   listProperties,
+  removeOrDeactivatePropertyForOwner,
+  removeOrDeactivateRoomForOwner,
   reviewPropertyVerification,
+  updatePropertyForOwner,
+  updateRoomForOwner,
 } from './property.service'
 
 const propertyRouter = Router()
@@ -60,6 +65,28 @@ propertyRouter.post(
   }),
 )
 
+propertyRouter.patch(
+  '/owner/:id',
+  requireAuth,
+  requireRole(['hotel_owner', 'admin']),
+  asyncHandler(async (req, res) => {
+    const input = createOwnerPropertySchema.parse(req.body)
+    const property = await updatePropertyForOwner(Number(req.params.id), (req as AuthenticatedRequest).user!, input)
+    res.json(property)
+  }),
+)
+
+propertyRouter.delete(
+  '/owner/:id',
+  requireAuth,
+  requireRole(['hotel_owner', 'admin']),
+  asyncHandler(async (req, res) => {
+    const input = ownerPropertyMutationSchema.parse(req.body)
+    const property = await removeOrDeactivatePropertyForOwner(Number(req.params.id), (req as AuthenticatedRequest).user!, input.action)
+    res.json(property)
+  }),
+)
+
 propertyRouter.post(
   '/:id/rooms',
   requireAuth,
@@ -68,6 +95,28 @@ propertyRouter.post(
     const input = createRoomSchema.parse(req.body)
     const room = await createRoomForOwner(Number(req.params.id), (req as AuthenticatedRequest).user!, input)
     res.status(201).json(room)
+  }),
+)
+
+propertyRouter.patch(
+  '/rooms/:roomId',
+  requireAuth,
+  requireRole(['hotel_owner', 'admin']),
+  asyncHandler(async (req, res) => {
+    const input = createRoomSchema.parse(req.body)
+    const room = await updateRoomForOwner(Number(req.params.roomId), (req as AuthenticatedRequest).user!, input)
+    res.json(room)
+  }),
+)
+
+propertyRouter.delete(
+  '/rooms/:roomId',
+  requireAuth,
+  requireRole(['hotel_owner', 'admin']),
+  asyncHandler(async (req, res) => {
+    const input = ownerPropertyMutationSchema.parse(req.body)
+    const room = await removeOrDeactivateRoomForOwner(Number(req.params.roomId), (req as AuthenticatedRequest).user!, input.action)
+    res.json(room)
   }),
 )
 

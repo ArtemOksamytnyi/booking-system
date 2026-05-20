@@ -19,6 +19,7 @@ export const listProperties = async (filters: ListPropertiesFilters = {}) =>
     where: {
       ...(!filters.ownerEmail
         ? {
+            isActive: true,
             verificationStatus: VerificationStatus.APPROVED,
           }
         : {}),
@@ -132,6 +133,7 @@ export const createProperty = async (ownerId: number, data: {
       address: data.address,
       description: data.description,
       photoUrl: data.photoUrl,
+      isActive: true,
     },
   })
 
@@ -171,6 +173,7 @@ export const createPropertyForOwner = async (ownerId: number, data: {
       address: data.address,
       description: data.description,
       photoUrl: data.photoUrl,
+      isActive: true,
       verificationStatus: VerificationStatus.PENDING,
     },
     include: {
@@ -227,6 +230,274 @@ export const createRoomForOwner = async (
       pricePerUnit: data.pricePerUnit,
       isActive: data.isActive,
     },
+  })
+}
+
+export const updatePropertyForOwner = async (
+  propertyId: number,
+  actor: { userId: number; role: 'user' | 'hotel_owner' | 'admin' },
+  data: {
+    propertyTypeName: string
+    name: string
+    address: string
+    description?: string
+    photoUrl?: string
+  },
+) => {
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+  })
+
+  if (!property) {
+    throw new HttpError(404, 'Property not found')
+  }
+
+  if (actor.role !== 'admin' && property.ownerId !== actor.userId) {
+    throw new HttpError(403, 'You do not have access to this property')
+  }
+
+  const propertyType = await prisma.propertyType.findFirst({
+    where: {
+      name: {
+        equals: data.propertyTypeName.trim(),
+        mode: 'insensitive',
+      },
+    },
+  })
+
+  if (!propertyType) {
+    throw new HttpError(404, 'Property type not found')
+  }
+
+  return prisma.property.update({
+    where: { id: property.id },
+    data: {
+      propertyTypeId: propertyType.id,
+      name: data.name,
+      address: data.address,
+      description: data.description,
+      photoUrl: data.photoUrl,
+    },
+  })
+}
+
+export const updateRoomForOwner = async (
+  roomId: number,
+  actor: { userId: number; role: 'user' | 'hotel_owner' | 'admin' },
+  data: {
+    name: string
+    capacity: number
+    pricePerUnit: number
+    isActive: boolean
+  },
+) => {
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: {
+      property: true,
+    },
+  })
+
+  if (!room) {
+    throw new HttpError(404, 'Room not found')
+  }
+
+  if (actor.role !== 'admin' && room.property.ownerId !== actor.userId) {
+    throw new HttpError(403, 'You do not have access to this room')
+  }
+
+  return prisma.room.update({
+    where: { id: room.id },
+    data,
+  })
+}
+
+const refundBookingPayments = async (bookingIds: number[]) => {
+  if (bookingIds.length === 0) {
+    return
+  }
+
+  await prisma.payment.updateMany({
+    where: {
+      bookingId: {
+        in: bookingIds,
+      },
+    },
+    data: {
+      paymentStatus: 'REFUNDED',
+    },
+  })
+
+  await prisma.reminder.deleteMany({
+    where: {
+      bookingId: {
+        in: bookingIds,
+      },
+    },
+  })
+
+  await prisma.booking.updateMany({
+    where: {
+      id: {
+        in: bookingIds,
+      },
+    },
+    data: {
+      bookingStatus: 'CANCELLED',
+      paymentStatus: 'REFUNDED',
+    },
+  })
+}
+
+const getRoomActiveBookings = async (roomId: number) =>
+  prisma.booking.findMany({
+    where: {
+      roomId,
+      bookingStatus: {
+        in: ['PENDING', 'CONFIRMED'],
+      },
+    },
+  })
+
+export const removeOrDeactivateRoomForOwner = async (
+  roomId: number,
+  actor: { userId: number; role: 'user' | 'hotel_owner' | 'admin' },
+  action: 'delete' | 'deactivate' | 'cancel_pending',
+) => {
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: {
+      property: true,
+    },
+  })
+
+  if (!room) {
+    throw new HttpError(404, 'Room not found')
+  }
+
+  if (actor.role !== 'admin' && room.property.ownerId !== actor.userId) {
+    throw new HttpError(403, 'You do not have access to this room')
+  }
+
+  const activeBookings = await getRoomActiveBookings(room.id)
+  const confirmedBookings = activeBookings.filter((booking) => booking.bookingStatus === 'CONFIRMED')
+  const pendingBookings = activeBookings.filter((booking) => booking.bookingStatus === 'PENDING')
+
+  if (action === 'cancel_pending') {
+    await refundBookingPayments(pendingBookings.map((booking) => booking.id))
+
+    if (confirmedBookings.length > 0) {
+      return prisma.room.update({
+        where: { id: room.id },
+        data: {
+          isActive: false,
+        },
+      })
+    }
+
+    return prisma.room.delete({
+      where: { id: room.id },
+    })
+  }
+
+  if (action === 'deactivate') {
+    return prisma.room.update({
+      where: { id: room.id },
+      data: {
+        isActive: false,
+      },
+    })
+  }
+
+  if (activeBookings.length > 0) {
+    if (confirmedBookings.length > 0) {
+      throw new HttpError(409, 'Room has confirmed bookings. Deactivate it instead.')
+    }
+
+    throw new HttpError(409, 'Room has pending bookings. Cancel pending bookings first.')
+  }
+
+  return prisma.room.delete({
+    where: { id: room.id },
+  })
+}
+
+export const removeOrDeactivatePropertyForOwner = async (
+  propertyId: number,
+  actor: { userId: number; role: 'user' | 'hotel_owner' | 'admin' },
+  action: 'delete' | 'deactivate' | 'cancel_pending',
+) => {
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+    include: {
+      rooms: {
+        include: {
+          bookings: {
+            where: {
+              bookingStatus: {
+                in: ['PENDING', 'CONFIRMED'],
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!property) {
+    throw new HttpError(404, 'Property not found')
+  }
+
+  if (actor.role !== 'admin' && property.ownerId !== actor.userId) {
+    throw new HttpError(403, 'You do not have access to this property')
+  }
+
+  const activeBookings = property.rooms.flatMap((room) => room.bookings)
+  const confirmedBookings = activeBookings.filter((booking) => booking.bookingStatus === 'CONFIRMED')
+  const pendingBookings = activeBookings.filter((booking) => booking.bookingStatus === 'PENDING')
+
+  if (action === 'cancel_pending') {
+    await refundBookingPayments(pendingBookings.map((booking) => booking.id))
+
+    if (confirmedBookings.length > 0) {
+      await prisma.room.updateMany({
+        where: { propertyId: property.id },
+        data: { isActive: false },
+      })
+
+      return prisma.property.update({
+        where: { id: property.id },
+        data: { isActive: false },
+      })
+    }
+
+    return prisma.property.delete({
+      where: { id: property.id },
+    })
+  }
+
+  if (action === 'deactivate') {
+    await prisma.room.updateMany({
+      where: { propertyId: property.id },
+      data: { isActive: false },
+    })
+
+    return prisma.property.update({
+      where: { id: property.id },
+      data: { isActive: false },
+    })
+  }
+
+  if (activeBookings.length > 0) {
+    if (confirmedBookings.length > 0) {
+      throw new HttpError(409, 'Property has confirmed bookings. Deactivate it instead.')
+    }
+
+    throw new HttpError(409, 'Property has pending bookings. Cancel pending bookings first.')
+  }
+
+  return prisma.property.delete({
+    where: { id: property.id },
   })
 }
 
@@ -392,6 +663,10 @@ export const getAvailableRooms = async (
   guests: number,
 ) => {
   const property = await getPropertyById(propertyId)
+
+  if (!property.isActive) {
+    throw new HttpError(400, 'Property is inactive')
+  }
 
   const rooms = await prisma.room.findMany({
     where: {

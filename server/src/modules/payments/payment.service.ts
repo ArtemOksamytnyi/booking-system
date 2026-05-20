@@ -2,6 +2,7 @@ import { BookingStatus, PaymentMethod, PaymentStatus } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import type { AuthenticatedUser } from '../../types/auth'
 import { HttpError } from '../../utils/http'
+import { syncBookingPaymentAutomation } from '../bookings/booking.service'
 
 export const createPayment = async (actor: AuthenticatedUser, input: {
   bookingId: number
@@ -70,6 +71,17 @@ export const createPayment = async (actor: AuthenticatedUser, input: {
       paymentStatus,
     },
   })
+
+  if (paymentStatus === PaymentStatus.PAID) {
+    await prisma.reminder.deleteMany({
+      where: {
+        bookingId: booking.id,
+        remindAt: new Date(booking.startDatetime.getTime() - 2 * 24 * 60 * 60 * 1000),
+      },
+    })
+  }
+
+  await syncBookingPaymentAutomation()
 
   return payment
 }

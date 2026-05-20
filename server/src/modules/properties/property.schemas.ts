@@ -33,6 +33,10 @@ export const createRoomSchema = z.object({
   isActive: z.boolean().default(true),
 })
 
+export const ownerPropertyMutationSchema = z.object({
+  action: z.enum(['delete', 'deactivate', 'cancel_pending']),
+})
+
 export const createReviewSchema = z.object({
   rating: z.coerce.number().int().min(1).max(5),
   comment: z.preprocess(

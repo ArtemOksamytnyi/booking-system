@@ -10,6 +10,57 @@ const countNights = (start: Date, end: Date) => {
   return Math.max(nights, 1)
 }
 
+const paymentReminderDate = (startDatetime: Date) => new Date(startDatetime.getTime() - 2 * 24 * 60 * 60 * 1000)
+
+const refundBooking = async (bookingId: number) => {
+  await prisma.payment.updateMany({
+    where: {
+      bookingId,
+    },
+    data: {
+      paymentStatus: PaymentStatus.REFUNDED,
+    },
+  })
+
+  await prisma.reminder.deleteMany({
+    where: {
+      bookingId,
+    },
+  })
+
+  await prisma.booking.update({
+    where: {
+      id: bookingId,
+    },
+    data: {
+      bookingStatus: BookingStatus.CANCELLED,
+      paymentStatus: PaymentStatus.REFUNDED,
+    },
+  })
+}
+
+const ensurePartialPaymentReminder = async (bookingId: number, renterId: number, startDatetime: Date) => {
+  const remindAt = paymentReminderDate(startDatetime)
+  const existingReminder = await prisma.reminder.findFirst({
+    where: {
+      bookingId,
+      userId: renterId,
+      remindAt,
+    },
+  })
+
+  if (!existingReminder) {
+    await prisma.reminder.create({
+      data: {
+        bookingId,
+        userId: renterId,
+        remindAt,
+        isSent: false,
+      },
+    })
+  }
+}
+
 export const syncExpiredBookings = async () =>
   prisma.booking.updateMany({
     where: {
@@ -24,6 +75,29 @@ export const syncExpiredBookings = async () =>
       bookingStatus: BookingStatus.COMPLETED,
     },
   })
+
+export const syncBookingPaymentAutomation = async () => {
+  const partialBookings = await prisma.booking.findMany({
+    where: {
+      paymentStatus: PaymentStatus.PARTIALLY_PAID,
+      bookingStatus: {
+        in: [BookingStatus.PENDING, BookingStatus.CONFIRMED],
+      },
+    },
+  })
+
+  const now = new Date()
+  const oneDayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+
+  for (const booking of partialBookings) {
+    if (booking.startDatetime <= oneDayAhead) {
+      await refundBooking(booking.id)
+      continue
+    }
+
+    await ensurePartialPaymentReminder(booking.id, booking.renterId, booking.startDatetime)
+  }
+}
 
 export const createBooking = async (
   renterId: number,
@@ -99,6 +173,7 @@ export const createBooking = async (
 
 export const listUserBookings = async (userId: number) => {
   await syncExpiredBookings()
+  await syncBookingPaymentAutomation()
 
   return prisma.booking.findMany({
     where: { renterId: userId },
@@ -118,6 +193,7 @@ export const listUserBookings = async (userId: number) => {
 
 export const listOwnerBookings = async (ownerId: number) => {
   await syncExpiredBookings()
+  await syncBookingPaymentAutomation()
 
   return prisma.booking.findMany({
     where: {
@@ -148,6 +224,7 @@ export const listOwnerBookings = async (ownerId: number) => {
 
 export const listAllBookings = async () => {
   await syncExpiredBookings()
+  await syncBookingPaymentAutomation()
 
   return prisma.booking.findMany({
     include: {
@@ -175,6 +252,7 @@ export const updateBookingStatus = async (
   status: 'CONFIRMED' | 'CANCELLED',
 ) => {
   await syncExpiredBookings()
+  await syncBookingPaymentAutomation()
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -208,15 +286,31 @@ export const updateBookingStatus = async (
     throw new HttpError(400, 'Completed bookings cannot be cancelled')
   }
 
+  if (status === 'CANCELLED') {
+    await refundBooking(booking.id)
+
+    return prisma.booking.findUniqueOrThrow({
+      where: { id: booking.id },
+      include: {
+        room: {
+          include: {
+            property: true,
+          },
+        },
+        renter: {
+          include: {
+            role: true,
+          },
+        },
+        payments: true,
+      },
+    })
+  }
+
   return prisma.booking.update({
     where: { id: booking.id },
     data: {
       bookingStatus: BookingStatus[status],
-      ...(status === 'CANCELLED' && booking.paymentStatus === PaymentStatus.PAID
-        ? {
-            paymentStatus: PaymentStatus.REFUNDED,
-          }
-        : {}),
     },
     include: {
       room: {
