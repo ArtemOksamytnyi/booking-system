@@ -34,7 +34,7 @@ export const createRoomSchema = z.object({
 })
 
 export const ownerPropertyMutationSchema = z.object({
-  action: z.enum(['delete', 'deactivate', 'cancel_pending']),
+  action: z.enum(['delete', 'deactivate', 'activate', 'cancel_pending']),
 })
 
 export const createReviewSchema = z.object({

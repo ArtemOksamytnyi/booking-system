@@ -1,6 +1,7 @@
 import { BookingStatus, VerificationStatus } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { HttpError } from '../../utils/http'
+import { listTopOwners } from '../users/user.service'
 
 type ListPropertiesFilters = {
   search?: string
@@ -197,6 +198,45 @@ export const listPropertyTypes = async () =>
     },
   })
 
+export const listSuperHostProperties = async () => {
+  const topOwners = await listTopOwners()
+  const topOwnerIds = topOwners.map((owner) => owner.ownerId)
+
+  if (topOwnerIds.length === 0) {
+    return []
+  }
+
+  return prisma.property.findMany({
+    where: {
+      ownerId: {
+        in: topOwnerIds,
+      },
+      isActive: true,
+      verificationStatus: VerificationStatus.APPROVED,
+    },
+    include: {
+      propertyType: true,
+      owner: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+      rooms: true,
+      reviews: {
+        select: {
+          rating: true,
+        },
+      },
+    },
+    orderBy: {
+      rating: 'desc',
+    },
+  })
+}
+
 export const createRoomForOwner = async (
   propertyId: number,
   actor: { userId: number; role: 'user' | 'hotel_owner' | 'admin' },
@@ -362,7 +402,7 @@ const getRoomActiveBookings = async (roomId: number) =>
 export const removeOrDeactivateRoomForOwner = async (
   roomId: number,
   actor: { userId: number; role: 'user' | 'hotel_owner' | 'admin' },
-  action: 'delete' | 'deactivate' | 'cancel_pending',
+  action: 'delete' | 'deactivate' | 'activate' | 'cancel_pending',
 ) => {
   const room = await prisma.room.findUnique({
     where: { id: roomId },
@@ -409,6 +449,15 @@ export const removeOrDeactivateRoomForOwner = async (
     })
   }
 
+  if (action === 'activate') {
+    return prisma.room.update({
+      where: { id: room.id },
+      data: {
+        isActive: true,
+      },
+    })
+  }
+
   if (activeBookings.length > 0) {
     if (confirmedBookings.length > 0) {
       throw new HttpError(409, 'Room has confirmed bookings. Deactivate it instead.')
@@ -425,7 +474,7 @@ export const removeOrDeactivateRoomForOwner = async (
 export const removeOrDeactivatePropertyForOwner = async (
   propertyId: number,
   actor: { userId: number; role: 'user' | 'hotel_owner' | 'admin' },
-  action: 'delete' | 'deactivate' | 'cancel_pending',
+  action: 'delete' | 'deactivate' | 'activate' | 'cancel_pending',
 ) => {
   const property = await prisma.property.findUnique({
     where: { id: propertyId },
@@ -485,6 +534,18 @@ export const removeOrDeactivatePropertyForOwner = async (
     return prisma.property.update({
       where: { id: property.id },
       data: { isActive: false },
+    })
+  }
+
+  if (action === 'activate') {
+    await prisma.room.updateMany({
+      where: { propertyId: property.id },
+      data: { isActive: true },
+    })
+
+    return prisma.property.update({
+      where: { id: property.id },
+      data: { isActive: true },
     })
   }
 

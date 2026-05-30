@@ -20,6 +20,7 @@ import {
   getPropertyById,
   listPropertyTypes,
   listProperties,
+  listSuperHostProperties,
   removeOrDeactivatePropertyForOwner,
   removeOrDeactivateRoomForOwner,
   reviewPropertyVerification,
@@ -51,6 +52,14 @@ propertyRouter.get(
   asyncHandler(async (_req, res) => {
     const propertyTypes = await listPropertyTypes()
     res.json(propertyTypes)
+  }),
+)
+
+propertyRouter.get(
+  '/super-hosts',
+  asyncHandler(async (_req, res) => {
+    const properties = await listSuperHostProperties()
+    res.json(properties)
   }),
 )
 

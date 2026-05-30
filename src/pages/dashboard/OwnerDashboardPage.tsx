@@ -52,6 +52,7 @@ function OwnerDashboardPage() {
   const [editingRoomId, setEditingRoomId] = useState<number | null>(null)
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null)
   const [ownerDecisionComment, setOwnerDecisionComment] = useState('')
+  const [expandedHotels, setExpandedHotels] = useState<Record<number, boolean>>({})
 
   const { data: ownedHotels = [], isLoading: isLoadingHotels } = useQuery({
     enabled: Boolean(user?.email),
@@ -155,7 +156,7 @@ function OwnerDashboardPage() {
   })
 
   const removeHotelMutation = useMutation({
-    mutationFn: (payload: { propertyId: number; action: 'delete' | 'deactivate' | 'cancel_pending' }) =>
+    mutationFn: (payload: { propertyId: number; action: 'delete' | 'deactivate' | 'activate' | 'cancel_pending' }) =>
       removeOrDeactivateOwnerProperty(payload.propertyId, payload.action),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-properties', user?.email] })
@@ -166,7 +167,7 @@ function OwnerDashboardPage() {
   })
 
   const removeRoomMutation = useMutation({
-    mutationFn: (payload: { roomId: number; action: 'delete' | 'deactivate' | 'cancel_pending' }) =>
+    mutationFn: (payload: { roomId: number; action: 'delete' | 'deactivate' | 'activate' | 'cancel_pending' }) =>
       removeOrDeactivateRoomForProperty(payload.roomId, payload.action),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-properties', user?.email] })
@@ -247,9 +248,30 @@ function OwnerDashboardPage() {
     setRoomIsActive(room.isActive)
   }
 
+  const toggleRoomsVisibility = (hotelId: number) => {
+    setExpandedHotels((current) => ({
+      ...current,
+      [hotelId]: !current[hotelId],
+    }))
+  }
+
   const askPropertyAction = (propertyId: number) => {
-    const action = window.prompt('Type one action: delete, deactivate, cancel_pending')
-    if (action === 'delete' || action === 'deactivate' || action === 'cancel_pending') {
+    const hotel = ownedHotels.find((item) => item.id === propertyId)
+
+    if (!hotel) {
+      return
+    }
+
+    const action = hotel.isActive
+      ? window.prompt('Type one action: delete, deactivate, cancel_pending')
+      : window.prompt('Type one action: activate or delete')
+
+    if (
+      action === 'delete' ||
+      action === 'deactivate' ||
+      action === 'activate' ||
+      action === 'cancel_pending'
+    ) {
       removeHotelMutation.mutate(
         { propertyId, action },
         {
@@ -262,8 +284,22 @@ function OwnerDashboardPage() {
   }
 
   const askRoomAction = (roomId: number) => {
-    const action = window.prompt('Type one action: delete, deactivate, cancel_pending')
-    if (action === 'delete' || action === 'deactivate' || action === 'cancel_pending') {
+    const room = ownedHotels.flatMap((hotel) => hotel.rooms).find((item) => item.id === roomId)
+
+    if (!room) {
+      return
+    }
+
+    const action = room.isActive
+      ? window.prompt('Type one action: delete, deactivate, cancel_pending')
+      : window.prompt('Type one action: activate or delete')
+
+    if (
+      action === 'delete' ||
+      action === 'deactivate' ||
+      action === 'activate' ||
+      action === 'cancel_pending'
+    ) {
       removeRoomMutation.mutate(
         { roomId, action },
         {
@@ -546,16 +582,22 @@ function OwnerDashboardPage() {
                       Edit Hotel
                     </button>
                     <button
-                      className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-600"
+                      className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                        hotel.isActive
+                          ? 'border border-rose-300 text-rose-600'
+                          : 'border border-emerald-300 text-emerald-700'
+                      }`}
                       onClick={() => askPropertyAction(hotel.id)}
                       type="button"
                     >
-                      Remove / Deactivate
+                      {hotel.isActive ? 'Remove / Deactivate' : 'Activate / Remove'}
                     </button>
                   </div>
                   {hotel.rooms.length > 0 ? (
                     <div className="space-y-2 pt-2">
-                      {hotel.rooms.map((room) => (
+                      {hotel.rooms
+                        .slice(0, expandedHotels[hotel.id] ? hotel.rooms.length : 3)
+                        .map((room) => (
                         <div key={room.id} className="rounded-xl bg-slate-50 p-3">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
@@ -575,16 +617,29 @@ function OwnerDashboardPage() {
                                 Edit
                               </button>
                               <button
-                                className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-600"
+                                className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                                  room.isActive
+                                    ? 'border border-rose-300 text-rose-600'
+                                    : 'border border-emerald-300 text-emerald-700'
+                                }`}
                                 onClick={() => askRoomAction(room.id)}
                                 type="button"
                               >
-                                Remove / Deactivate
+                                {room.isActive ? 'Remove / Deactivate' : 'Activate / Remove'}
                               </button>
                             </div>
                           </div>
                         </div>
                       ))}
+                      {hotel.rooms.length > 3 ? (
+                        <button
+                          className="text-sm font-semibold text-primary hover:underline"
+                          onClick={() => toggleRoomsVisibility(hotel.id)}
+                          type="button"
+                        >
+                          {expandedHotels[hotel.id] ? 'Show less' : `Show all (${hotel.rooms.length})`}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

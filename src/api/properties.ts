@@ -172,6 +172,11 @@ export const getProperties = async (filters: PropertyFilters = {}) => {
   return properties.map(mapPropertyToHotel)
 }
 
+export const getSuperHostProperties = async () => {
+  const properties = await apiFetch<ApiProperty[]>('/properties/super-hosts')
+  return properties.map(mapPropertyToHotel)
+}
+
 export const getPropertyById = async (id: number) => {
   const property = await apiFetch<ApiProperty>(`/properties/${id}`)
   return mapPropertyToHotel(property)
@@ -247,7 +252,7 @@ export const updateOwnerProperty = async (
 
 export const removeOrDeactivateOwnerProperty = async (
   propertyId: number,
-  action: 'delete' | 'deactivate' | 'cancel_pending',
+  action: 'delete' | 'deactivate' | 'activate' | 'cancel_pending',
 ) =>
   apiFetch(`/properties/owner/${propertyId}`, {
     method: 'DELETE',
@@ -270,7 +275,7 @@ export const updateRoomForProperty = async (
 
 export const removeOrDeactivateRoomForProperty = async (
   roomId: number,
-  action: 'delete' | 'deactivate' | 'cancel_pending',
+  action: 'delete' | 'deactivate' | 'activate' | 'cancel_pending',
 ) =>
   apiFetch(`/properties/rooms/${roomId}`, {
     method: 'DELETE',

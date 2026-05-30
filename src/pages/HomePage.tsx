@@ -1,7 +1,12 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { getHighlightsFromHotels, getProperties } from '../api/properties'
+import {
+  buildHotelSlug,
+  getHighlightsFromHotels,
+  getProperties,
+  getSuperHostProperties,
+} from '../api/properties'
 import { useUiStore } from '../store/uiStore'
 
 const StatIcon = ({ path }: { path: string }) => (
@@ -24,10 +29,17 @@ function HomePage() {
     queryKey: ['properties', 'home'],
     queryFn: () => getProperties(),
   })
+  const { data: superHostHotels = [] } = useQuery({
+    queryKey: ['properties', 'super-hosts'],
+    queryFn: getSuperHostProperties,
+  })
 
   const cities = useMemo(() => ['All', ...new Set(hotels.map((hotel) => hotel.city))], [hotels])
   const highlights = useMemo(() => getHighlightsFromHotels(hotels), [hotels])
-  const featuredHotels = useMemo(() => hotels.slice(0, 8), [hotels])
+  const featuredHotels = useMemo(
+    () => (superHostHotels.length > 0 ? superHostHotels.slice(0, 8) : hotels.slice(0, 8)),
+    [hotels, superHostHotels],
+  )
   const { city, checkIn, checkOut, guests } = hotelFilters
 
   const submitSearch = () => {
@@ -156,8 +168,9 @@ function HomePage() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-3">
             {highlights.map((item) => (
-              <article
+              <Link
                 key={item.id}
+                to={`/hotels/${buildHotelSlug(item.id, item.name)}`}
                 className={`group relative overflow-hidden rounded-2xl ${item.tall ? 'h-full min-h-[420px] lg:row-span-2' : 'min-h-[200px]'}`}
               >
                 <img
@@ -173,13 +186,24 @@ function HomePage() {
                   <p className="text-2xl font-medium">{item.name}</p>
                   <p className="text-sm text-white/80">{item.location}</p>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         )}
       </section>
 
-      <section className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-semibold text-slate-900">
+            {superHostHotels.length > 0 ? 'Super Host Stays' : 'Popular Stays'}
+          </h2>
+          <p className="mt-2 text-sm text-slate-400">
+            {superHostHotels.length > 0
+              ? 'These properties belong to the most profitable and highest-rated hosts on the platform.'
+              : 'A quick selection of approved stays from our catalog.'}
+          </p>
+        </div>
+        <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
         {featuredHotels.map((hotel) => (
           <article key={hotel.id} className="space-y-4">
             <div className="group relative overflow-hidden rounded-2xl">
@@ -190,7 +214,14 @@ function HomePage() {
               />
             </div>
             <div>
-              <h3 className="text-2xl font-medium text-slate-900">{hotel.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-2xl font-medium text-slate-900">{hotel.name}</h3>
+                {superHostHotels.some((item) => item.id === hotel.id) ? (
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                    Super Host
+                  </span>
+                ) : null}
+              </div>
               <p className="text-sm text-slate-400">{hotel.location}</p>
               <Link
                 className="mt-2 inline-flex text-sm font-semibold text-primary hover:underline"
@@ -201,6 +232,7 @@ function HomePage() {
             </div>
           </article>
         ))}
+        </div>
       </section>
     </div>
   )
