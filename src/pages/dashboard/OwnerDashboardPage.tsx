@@ -28,8 +28,6 @@ const tabItems: Array<{ id: OwnerDashboardTab; label: string }> = [
   { id: 'hotels', label: 'Hotel Management' },
   { id: 'bookings', label: 'Bookings' },
   { id: 'reminders', label: 'Reminders' },
-  { id: 'messages', label: 'Message' },
-  { id: 'settings', label: 'Setting' },
 ]
 
 function OwnerDashboardPage() {
@@ -37,6 +35,7 @@ function OwnerDashboardPage() {
   const queryClient = useQueryClient()
   const activeTab = useUiStore((state) => state.ownerDashboardTab)
   const setActiveTab = useUiStore((state) => state.setOwnerDashboardTab)
+  const selectedTab = tabItems.some((item) => item.id === activeTab) ? activeTab : 'hotels'
   const [hotelName, setHotelName] = useState('')
   const [hotelLocation, setHotelLocation] = useState('')
   const [hotelType, setHotelType] = useState('hotel')
@@ -392,7 +391,7 @@ function OwnerDashboardPage() {
   )
 
   const content = () => {
-    if (activeTab === 'dashboard') {
+    if (selectedTab === 'dashboard') {
       return (
         <div className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-4">
@@ -446,7 +445,7 @@ function OwnerDashboardPage() {
       )
     }
 
-    if (activeTab === 'hotels') {
+    if (selectedTab === 'hotels') {
       return (
         <div className="space-y-5">
           <div className="grid gap-3 md:grid-cols-2">
@@ -686,7 +685,7 @@ function OwnerDashboardPage() {
       )
     }
 
-    if (activeTab === 'bookings') {
+    if (selectedTab === 'bookings') {
       return (
         <div className="space-y-4">
           <p className="text-slate-600">Your own travel bookings are listed below.</p>
@@ -703,7 +702,7 @@ function OwnerDashboardPage() {
       )
     }
 
-    if (activeTab === 'reminders') {
+    if (selectedTab === 'reminders') {
       return (
         <div className="space-y-3">
           {reminders.map((reminder) => (
@@ -726,11 +725,7 @@ function OwnerDashboardPage() {
       )
     }
 
-    if (activeTab === 'messages') {
-      return <p className="text-slate-600">Owner message center to communicate with guests and admin.</p>
-    }
-
-    return <p className="text-slate-600">Owner settings for payout account and hotel preferences.</p>
+    return null
   }
 
   return (
@@ -742,7 +737,7 @@ function OwnerDashboardPage() {
             {tabItems.map((item) => (
               <button
                 key={item.id}
-                className={`block w-full text-left ${activeTab === item.id ? 'font-semibold text-primary' : ''}`}
+                className={`block w-full text-left ${selectedTab === item.id ? 'font-semibold text-primary' : ''}`}
                 onClick={() => setActiveTab(item.id)}
                 type="button"
               >
@@ -776,7 +771,7 @@ function OwnerDashboardPage() {
 
           <div className="rounded-3xl bg-white p-5">
             <h2 className="mb-5 text-4xl font-semibold text-slate-900">
-              {tabItems.find((t) => t.id === activeTab)?.label}
+              {tabItems.find((t) => t.id === selectedTab)?.label}
             </h2>
             {content()}
           </div>

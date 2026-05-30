@@ -19,10 +19,6 @@ const tabItems: Array<{ id: AdminDashboardTab; label: string }> = [
   { id: 'owners', label: 'Hotel Owners' },
   { id: 'bookings', label: 'Booking Details' },
   { id: 'reminders', label: 'Reminders' },
-  { id: 'refunds', label: 'Refund' },
-  { id: 'messages', label: 'Message' },
-  { id: 'help', label: 'Help' },
-  { id: 'settings', label: 'Setting' },
 ]
 
 function AdminDashboardPage() {
@@ -30,6 +26,7 @@ function AdminDashboardPage() {
   const queryClient = useQueryClient()
   const activeTab = useUiStore((state) => state.adminDashboardTab)
   const setActiveTab = useUiStore((state) => state.setAdminDashboardTab)
+  const selectedTab = tabItems.some((item) => item.id === activeTab) ? activeTab : 'dashboard'
   const search = useUiStore((state) => state.adminSearch)
   const setSearch = useUiStore((state) => state.setAdminSearch)
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
@@ -213,7 +210,7 @@ function AdminDashboardPage() {
   )
 
   const content = () => {
-    if (activeTab === 'dashboard') {
+    if (selectedTab === 'dashboard') {
       return (
         <div className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-4">
@@ -244,7 +241,7 @@ function AdminDashboardPage() {
       )
     }
 
-    if (activeTab === 'users') {
+    if (selectedTab === 'users') {
       return (
         <div className="space-y-3">
           {filteredUsers.map((person) => (
@@ -262,7 +259,7 @@ function AdminDashboardPage() {
       )
     }
 
-    if (activeTab === 'owners') {
+    if (selectedTab === 'owners') {
       return (
 
         <div className="space-y-5">
@@ -387,7 +384,7 @@ function AdminDashboardPage() {
       )
     }
 
-    if (activeTab === 'bookings') {
+    if (selectedTab === 'bookings') {
       return (
         <div className="space-y-4">
           <p className="text-slate-600">All bookings from the database are listed below.</p>
@@ -396,7 +393,7 @@ function AdminDashboardPage() {
       )
     }
 
-    if (activeTab === 'reminders') {
+    if (selectedTab === 'reminders') {
       return (
         <div className="space-y-3">
           {reminders.map((reminder) => (
@@ -419,19 +416,7 @@ function AdminDashboardPage() {
       )
     }
 
-    if (activeTab === 'refunds') {
-      return <p className="text-slate-600">Refund management panel: approve or reject refund requests.</p>
-    }
-
-    if (activeTab === 'messages') {
-      return <p className="text-slate-600">Message center for user and owner support communication.</p>
-    }
-
-    if (activeTab === 'help') {
-      return <p className="text-slate-600">Admin help center with moderation and operation guides.</p>
-    }
-
-    return <p className="text-slate-600">System settings for permissions, notifications and business rules.</p>
+    return null
   }
 
   return (
@@ -443,7 +428,7 @@ function AdminDashboardPage() {
             {tabItems.map((item) => (
               <button
                 key={item.id}
-                className={`block w-full text-left ${activeTab === item.id ? 'font-semibold text-primary' : ''}`}
+                className={`block w-full text-left ${selectedTab === item.id ? 'font-semibold text-primary' : ''}`}
                 onClick={() => setActiveTab(item.id)}
                 type="button"
               >
@@ -478,7 +463,7 @@ function AdminDashboardPage() {
 
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-4xl font-semibold text-slate-900">
-                {tabItems.find((t) => t.id === activeTab)?.label}
+                {tabItems.find((t) => t.id === selectedTab)?.label}
               </h2>
             </div>
 

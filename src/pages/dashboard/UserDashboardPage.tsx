@@ -11,10 +11,6 @@ const tabItems: Array<{ id: UserDashboardTab; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'bookings', label: 'Bookings' },
   { id: 'reminders', label: 'Reminders' },
-  { id: 'refunds', label: 'Refunds' },
-  { id: 'messages', label: 'Message' },
-  { id: 'help', label: 'Help' },
-  { id: 'settings', label: 'Setting' },
 ]
 
 function UserDashboardPage() {
@@ -22,6 +18,7 @@ function UserDashboardPage() {
   const queryClient = useQueryClient()
   const activeTab = useUiStore((state) => state.userDashboardTab)
   const setActiveTab = useUiStore((state) => state.setUserDashboardTab)
+  const selectedTab = tabItems.some((item) => item.id === activeTab) ? activeTab : 'bookings'
 
   const { data: bookings = [] } = useQuery({
     enabled: Boolean(user),
@@ -58,7 +55,7 @@ function UserDashboardPage() {
   })
 
   const content = () => {
-    if (activeTab === 'dashboard') {
+    if (selectedTab === 'dashboard') {
       return (
         <div className="grid gap-4 sm:grid-cols-3">
           <article className="rounded-2xl bg-slate-50 p-4">
@@ -81,7 +78,7 @@ function UserDashboardPage() {
       )
     }
 
-    if (activeTab === 'bookings') {
+    if (selectedTab === 'bookings') {
       return (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {bookings.map((booking) => (
@@ -144,7 +141,7 @@ function UserDashboardPage() {
       )
     }
 
-    if (activeTab === 'reminders') {
+    if (selectedTab === 'reminders') {
       return (
         <div className="space-y-3">
           {reminders.map((reminder) => (
@@ -167,62 +164,7 @@ function UserDashboardPage() {
       )
     }
 
-    if (activeTab === 'refunds') {
-      return (
-        <div className="space-y-3">
-          {bookings.map((booking) => (
-            <article key={`refund-${booking.id}`} className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
-              <div>
-                <p className="text-lg font-semibold text-slate-900">{booking.hotelName}</p>
-                <p className="text-sm text-slate-500">Paid ${booking.total}</p>
-              </div>
-              <button className="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary">
-                Request Refund
-              </button>
-            </article>
-          ))}
-          {bookings.length === 0 ? <p className="text-slate-500">No refundable bookings.</p> : null}
-        </div>
-      )
-    }
-
-    if (activeTab === 'messages') {
-      return (
-        <div className="space-y-3">
-          <div className="rounded-xl border border-slate-200 p-4">
-            <p className="font-semibold text-slate-900">Support</p>
-            <p className="mt-1 text-sm text-slate-500">How can we help you with your booking today?</p>
-          </div>
-          <textarea className="h-32 w-full rounded-xl border border-slate-200 p-3" placeholder="Write a message to support..." />
-          <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Send</button>
-        </div>
-      )
-    }
-
-    if (activeTab === 'help') {
-      return (
-        <div className="space-y-3">
-          <article className="rounded-xl bg-slate-50 p-4">
-            <p className="font-semibold text-slate-900">How do I change my booking dates?</p>
-            <p className="mt-1 text-sm text-slate-600">Open booking details and create a modification request.</p>
-          </article>
-          <article className="rounded-xl bg-slate-50 p-4">
-            <p className="font-semibold text-slate-900">How do refunds work?</p>
-            <p className="mt-1 text-sm text-slate-600">Refund status appears in the Refund tab after request submission.</p>
-          </article>
-        </div>
-      )
-    }
-
-    return (
-      <div className="space-y-3 max-w-lg">
-        <label className="grid gap-2">
-          <span className="text-sm text-slate-500">Notification email</span>
-          <input className="h-11 rounded-xl border border-slate-200 px-3" defaultValue={user?.email} />
-        </label>
-        <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Save Settings</button>
-      </div>
-    )
+    return null
   }
 
   return (
@@ -234,7 +176,7 @@ function UserDashboardPage() {
             {tabItems.map((item) => (
               <button
                 key={item.id}
-                className={`block w-full text-left ${activeTab === item.id ? 'font-semibold text-primary' : ''}`}
+                className={`block w-full text-left ${selectedTab === item.id ? 'font-semibold text-primary' : ''}`}
                 onClick={() => setActiveTab(item.id)}
                 type="button"
               >
@@ -259,8 +201,8 @@ function UserDashboardPage() {
 
           <div className="rounded-3xl bg-white p-5">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-4xl font-semibold text-slate-900">{tabItems.find((t) => t.id === activeTab)?.label}</h2>
-              {activeTab === 'bookings' ? <p className="text-base text-slate-500">{bookings.length} items</p> : null}
+              <h2 className="text-4xl font-semibold text-slate-900">{tabItems.find((t) => t.id === selectedTab)?.label}</h2>
+              {selectedTab === 'bookings' ? <p className="text-base text-slate-500">{bookings.length} items</p> : null}
             </div>
             {content()}
           </div>

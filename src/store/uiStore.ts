@@ -3,18 +3,14 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import type { Hotel, PropertyCategory } from '../types/hotel'
 
 export type AuthModalMode = 'login' | 'register'
-export type UserDashboardTab = 'dashboard' | 'bookings' | 'reminders' | 'refunds' | 'messages' | 'help' | 'settings'
+export type UserDashboardTab = 'dashboard' | 'bookings' | 'reminders'
 export type AdminDashboardTab =
   | 'dashboard'
   | 'users'
   | 'owners'
   | 'bookings'
   | 'reminders'
-  | 'refunds'
-  | 'messages'
-  | 'help'
-  | 'settings'
-export type OwnerDashboardTab = 'dashboard' | 'hotels' | 'bookings' | 'reminders' | 'messages' | 'settings'
+export type OwnerDashboardTab = 'dashboard' | 'hotels' | 'bookings' | 'reminders'
 
 type HotelFilters = {
   search: string
