@@ -21,6 +21,8 @@ const tabItems: Array<{ id: AdminDashboardTab; label: string }> = [
   { id: 'reminders', label: 'Reminders' },
 ]
 
+const verificationRequestsPerPage = 5
+
 function AdminDashboardPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -31,6 +33,7 @@ function AdminDashboardPage() {
   const setSearch = useUiStore((state) => state.setAdminSearch)
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
   const [adminComment, setAdminComment] = useState('')
+  const [verificationPage, setVerificationPage] = useState(1)
 
   const { data: users = [] } = useQuery({
     enabled: Boolean(user?.role === 'admin'),
@@ -91,6 +94,12 @@ function AdminDashboardPage() {
   )
 
   const selectedRequest = filteredRequests.find((item) => item.id === selectedRequestId) ?? null
+  const verificationPageCount = Math.max(1, Math.ceil(filteredRequests.length / verificationRequestsPerPage))
+  const verificationCurrentPage = Math.min(verificationPage, verificationPageCount)
+  const visibleVerificationRequests = filteredRequests.slice(
+    (verificationCurrentPage - 1) * verificationRequestsPerPage,
+    verificationCurrentPage * verificationRequestsPerPage,
+  )
 
   const reviewMutation = useMutation({
     mutationFn: async (status: 'approved' | 'rejected') => {
@@ -276,7 +285,7 @@ function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRequests.map((request) => (
+                {visibleVerificationRequests.map((request) => (
                   <tr key={request.id} className="border-b border-slate-100 text-base text-slate-700">
                     <td className="px-4 py-4">
                       <p className="font-medium text-slate-900">{request.ownerName}</p>
@@ -315,6 +324,41 @@ function AdminDashboardPage() {
               </tbody>
             </table>
           </div>
+          {filteredRequests.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
+              No verification requests match your search.
+            </p>
+          ) : null}
+          {filteredRequests.length > verificationRequestsPerPage ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-sm text-slate-500">
+                Showing {(verificationCurrentPage - 1) * verificationRequestsPerPage + 1}-
+                {Math.min(verificationCurrentPage * verificationRequestsPerPage, filteredRequests.length)} of{' '}
+                {filteredRequests.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={verificationCurrentPage === 1}
+                  onClick={() => setVerificationPage((page) => Math.max(1, page - 1))}
+                  type="button"
+                >
+                  Previous
+                </button>
+                <span className="min-w-20 text-center text-sm font-semibold text-slate-700">
+                  {verificationCurrentPage} / {verificationPageCount}
+                </span>
+                <button
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={verificationCurrentPage === verificationPageCount}
+                  onClick={() => setVerificationPage((page) => Math.min(verificationPageCount, page + 1))}
+                  type="button"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {selectedRequest ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -455,7 +499,10 @@ function AdminDashboardPage() {
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <input
                 className="h-11 flex-1 rounded-xl bg-slate-100 px-4 text-base outline-none"
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value)
+                  setVerificationPage(1)
+                }}
                 placeholder="Search owners, users or properties"
                 value={search}
               />

@@ -30,6 +30,8 @@ const tabItems: Array<{ id: OwnerDashboardTab; label: string }> = [
   { id: 'reminders', label: 'Reminders' },
 ]
 
+const hotelsPerPage = 6
+
 function OwnerDashboardPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -52,6 +54,7 @@ function OwnerDashboardPage() {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null)
   const [ownerDecisionComment, setOwnerDecisionComment] = useState('')
   const [expandedHotels, setExpandedHotels] = useState<Record<number, boolean>>({})
+  const [hotelPage, setHotelPage] = useState(1)
 
   const { data: ownedHotels = [], isLoading: isLoadingHotels } = useQuery({
     enabled: Boolean(user?.email),
@@ -209,6 +212,9 @@ function OwnerDashboardPage() {
         : '0.0',
     [ownedHotels],
   )
+  const hotelPageCount = Math.max(1, Math.ceil(ownedHotels.length / hotelsPerPage))
+  const hotelCurrentPage = Math.min(hotelPage, hotelPageCount)
+  const visibleHotels = ownedHotels.slice((hotelCurrentPage - 1) * hotelsPerPage, hotelCurrentPage * hotelsPerPage)
 
   const addHotel = () => {
     if (!hotelName.trim() || !hotelLocation.trim() || !user) {
@@ -534,7 +540,7 @@ function OwnerDashboardPage() {
                 Loading your hotels...
               </div>
             ) : null}
-            {ownedHotels.map((hotel) => (
+            {visibleHotels.map((hotel) => (
               <article key={hotel.slug} className="overflow-hidden rounded-2xl border border-slate-200">
                 <img alt={hotel.name} className="h-40 w-full object-cover" src={hotel.image} />
                 <div className="space-y-3 p-4">
@@ -650,6 +656,35 @@ function OwnerDashboardPage() {
               </div>
             ) : null}
           </div>
+          {ownedHotels.length > hotelsPerPage ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-sm text-slate-500">
+                Showing {(hotelCurrentPage - 1) * hotelsPerPage + 1}-
+                {Math.min(hotelCurrentPage * hotelsPerPage, ownedHotels.length)} of {ownedHotels.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={hotelCurrentPage === 1}
+                  onClick={() => setHotelPage((page) => Math.max(1, page - 1))}
+                  type="button"
+                >
+                  Previous
+                </button>
+                <span className="min-w-20 text-center text-sm font-semibold text-slate-700">
+                  {hotelCurrentPage} / {hotelPageCount}
+                </span>
+                <button
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={hotelCurrentPage === hotelPageCount}
+                  onClick={() => setHotelPage((page) => Math.min(hotelPageCount, page + 1))}
+                  type="button"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="rounded-2xl border border-slate-200 p-4">
             <h3 className="mb-3 text-xl font-semibold text-slate-900">My verification requests</h3>
