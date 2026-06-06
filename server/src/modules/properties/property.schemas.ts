@@ -24,6 +24,7 @@ export const createOwnerPropertySchema = z.object({
   address: z.string().trim().min(2).max(255),
   description: optionalTrimmedString,
   photoUrl: optionalUrlString,
+  verificationComment: optionalTrimmedString,
 })
 
 export const createRoomSchema = z.object({

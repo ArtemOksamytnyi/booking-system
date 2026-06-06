@@ -198,6 +198,7 @@ export const createOwnerProperty = async (payload: {
   description?: string
   photoUrl?: string
   propertyTypeName?: string
+  verificationComment?: string
 }) => {
   const property = await apiFetch<ApiProperty>('/properties/owner', {
     method: 'POST',

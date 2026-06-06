@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus } from '@prisma/client'
+import { BookingStatus, PaymentStatus, type Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import type { AuthenticatedUser } from '../../types/auth'
 import { calculateBookingTotals } from '../../utils/booking'
@@ -12,8 +12,8 @@ const countNights = (start: Date, end: Date) => {
 
 const paymentReminderDate = (startDatetime: Date) => new Date(startDatetime.getTime() - 2 * 24 * 60 * 60 * 1000)
 
-const refundBooking = async (bookingId: number) => {
-  await prisma.payment.updateMany({
+const refundBooking = async (bookingId: number, tx: Prisma.TransactionClient = prisma) => {
+  await tx.payment.updateMany({
     where: {
       bookingId,
     },
@@ -22,13 +22,13 @@ const refundBooking = async (bookingId: number) => {
     },
   })
 
-  await prisma.reminder.deleteMany({
+  await tx.reminder.deleteMany({
     where: {
       bookingId,
     },
   })
 
-  await prisma.booking.update({
+  await tx.booking.update({
     where: {
       id: bookingId,
     },
@@ -91,7 +91,7 @@ export const syncBookingPaymentAutomation = async () => {
 
   for (const booking of partialBookings) {
     if (booking.startDatetime <= oneDayAhead) {
-      await refundBooking(booking.id)
+      await prisma.$transaction((tx) => refundBooking(booking.id, tx))
       continue
     }
 
@@ -287,23 +287,25 @@ export const updateBookingStatus = async (
   }
 
   if (status === 'CANCELLED') {
-    await refundBooking(booking.id)
+    return prisma.$transaction(async (tx) => {
+      await refundBooking(booking.id, tx)
 
-    return prisma.booking.findUniqueOrThrow({
-      where: { id: booking.id },
-      include: {
-        room: {
-          include: {
-            property: true,
+      return tx.booking.findUniqueOrThrow({
+        where: { id: booking.id },
+        include: {
+          room: {
+            include: {
+              property: true,
+            },
           },
-        },
-        renter: {
-          include: {
-            role: true,
+          renter: {
+            include: {
+              role: true,
+            },
           },
+          payments: true,
         },
-        payments: true,
-      },
+      })
     })
   }
 

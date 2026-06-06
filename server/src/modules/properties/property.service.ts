@@ -144,51 +144,58 @@ export const createPropertyForOwner = async (ownerId: number, data: {
   address: string
   description?: string
   photoUrl?: string
+  verificationComment?: string
 }) => {
-  const owner = await prisma.user.findUnique({
-    where: { id: ownerId },
-  })
+  return prisma.$transaction(async (tx) => {
+    const owner = await tx.user.findUnique({
+      where: { id: ownerId },
+    })
 
-  if (!owner) {
-    throw new HttpError(404, 'Owner account not found')
-  }
+    if (!owner) {
+      throw new HttpError(404, 'Owner account not found')
+    }
 
-  const propertyType = await prisma.propertyType.findFirst({
-    where: {
-      name: {
-        equals: data.propertyTypeName.trim(),
-        mode: 'insensitive',
-      },
-    },
-  })
-
-  if (!propertyType) {
-    throw new HttpError(404, 'Property type not found')
-  }
-
-  const property = await prisma.property.create({
-    data: {
-      ownerId: owner.id,
-      propertyTypeId: propertyType.id,
-      name: data.name,
-      address: data.address,
-      description: data.description,
-      photoUrl: data.photoUrl,
-      isActive: true,
-      verificationStatus: VerificationStatus.PENDING,
-    },
-    include: {
-      propertyType: true,
-      rooms: true,
-      reviews: {
-        select: {
-          rating: true,
+    const propertyType = await tx.propertyType.findFirst({
+      where: {
+        name: {
+          equals: data.propertyTypeName.trim(),
+          mode: 'insensitive',
         },
       },
-    },
-  })
+    })
 
-  return property
+    if (!propertyType) {
+      throw new HttpError(404, 'Property type not found')
+    }
+
+    return tx.property.create({
+      data: {
+        ownerId: owner.id,
+        propertyTypeId: propertyType.id,
+        name: data.name,
+        address: data.address,
+        description: data.description,
+        photoUrl: data.photoUrl,
+        isActive: true,
+        verificationStatus: VerificationStatus.PENDING,
+        verificationRequests: {
+          create: {
+            ownerId: owner.id,
+            comment: data.verificationComment,
+          },
+        },
+      },
+      include: {
+        propertyType: true,
+        rooms: true,
+        reviews: {
+          select: {
+            rating: true,
+          },
+        },
+      },
+    })
+  })
 }
 
 export const listPropertyTypes = async () =>

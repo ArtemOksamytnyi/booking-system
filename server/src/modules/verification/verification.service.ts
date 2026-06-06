@@ -93,22 +93,24 @@ export const reviewVerificationRequest = async (
 
   const status = VerificationStatus[input.status]
 
-  const updatedRequest = await prisma.verificationRequest.update({
-    where: { id: requestId },
-    data: {
-      adminId,
-      status,
-      decisionDate: new Date(),
-      comment: input.comment,
-    },
-  })
+  return prisma.$transaction(async (tx) => {
+    const updatedRequest = await tx.verificationRequest.update({
+      where: { id: requestId },
+      data: {
+        adminId,
+        status,
+        decisionDate: new Date(),
+        comment: input.comment,
+      },
+    })
 
-  await prisma.property.update({
-    where: { id: request.propertyId },
-    data: {
-      verificationStatus: status,
-    },
-  })
+    await tx.property.update({
+      where: { id: request.propertyId },
+      data: {
+        verificationStatus: status,
+      },
+    })
 
-  return updatedRequest
+    return updatedRequest
+  })
 }

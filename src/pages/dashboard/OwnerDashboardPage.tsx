@@ -13,10 +13,7 @@ import {
   updateRoomForProperty,
 } from '../../api/properties'
 import { getMyReminders } from '../../api/reminders'
-import {
-  getVerificationRequests,
-  submitVerificationRequestToApi,
-} from '../../api/verification'
+import { getVerificationRequests } from '../../api/verification'
 import { getMyOwnerAnalytics } from '../../api/users'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateRange } from '../../context/BookingContext'
@@ -103,19 +100,14 @@ function OwnerDashboardPage() {
         description: hotelDescription.trim() || undefined,
         photoUrl: hotelPhotoUrl.trim() || undefined,
         propertyTypeName: hotelType,
+        verificationComment: verificationComment.trim() || undefined,
       }
 
       return editingHotelId
         ? updateOwnerProperty(editingHotelId, payload)
         : createOwnerProperty(payload)
     },
-    onSuccess: async (property) => {
-      if (!editingHotelId) {
-        await submitVerificationRequestToApi({
-          propertyId: property.id,
-          comment: verificationComment.trim() || undefined,
-        })
-      }
+    onSuccess: () => {
       setHotelName('')
       setHotelLocation('')
       setHotelType('hotel')

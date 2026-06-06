@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { createOwnerProperty } from '../api/properties'
-import { submitVerificationRequestToApi } from '../api/verification'
 import { ApiError } from '../api/client'
 import {
   loginRequest,
@@ -140,17 +139,13 @@ export const useAuthStore = create<AuthState>()(
               }
             }
 
-            const property = await createOwnerProperty({
+            await createOwnerProperty({
               name: propertyName.trim(),
               address: propertyAddress.trim(),
               description: propertyDescription?.trim() || undefined,
               photoUrl: propertyPhotoUrl?.trim() || undefined,
               propertyTypeName: propertyTypeName ?? 'hotel',
-            })
-
-            await submitVerificationRequestToApi({
-              propertyId: property.id,
-              comment: [
+              verificationComment: [
                 ownerComment?.trim(),
                 identityDocumentLink?.trim() ? `Identity document: ${identityDocumentLink.trim()}` : null,
                 propertyDocumentLink?.trim() ? `Property document: ${propertyDocumentLink.trim()}` : null,
