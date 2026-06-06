@@ -1,6 +1,13 @@
 import { prisma } from '../../lib/prisma'
 
-export const listTopOwners = async (minimumIncome = 1000) => {
+export type TopOwner = {
+  ownerId: number
+  name: string
+  totalIncome: number
+  averageRating: number
+}
+
+export const listTopOwners = async (minimumIncome = 1000): Promise<TopOwner[]> => {
   const allOwnerStats = await prisma.user.findMany({
     where: {
       role: {

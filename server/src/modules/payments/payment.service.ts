@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentMethod, PaymentStatus } from '@prisma/client'
+import { BookingStatus, PaymentMethod, PaymentStatus, type Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import type { AuthenticatedUser } from '../../types/auth'
 import { HttpError } from '../../utils/http'
@@ -9,7 +9,7 @@ export const createPayment = async (actor: AuthenticatedUser, input: {
   amount: number
   paymentMethod: keyof typeof PaymentMethod
 }) => {
-  const payment = await prisma.$transaction(async (tx) => {
+  const payment = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const booking = await tx.booking.findUnique({
       where: { id: input.bookingId },
       include: {

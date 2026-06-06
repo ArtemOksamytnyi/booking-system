@@ -1,7 +1,7 @@
-import { BookingStatus, VerificationStatus } from '@prisma/client'
+import { BookingStatus, VerificationStatus, type Booking, type Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { HttpError } from '../../utils/http'
-import { listTopOwners } from '../users/user.service'
+import { listTopOwners, type TopOwner } from '../users/user.service'
 
 type ListPropertiesFilters = {
   search?: string
@@ -146,7 +146,7 @@ export const createPropertyForOwner = async (ownerId: number, data: {
   photoUrl?: string
   verificationComment?: string
 }) => {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const owner = await tx.user.findUnique({
       where: { id: ownerId },
     })
@@ -207,7 +207,7 @@ export const listPropertyTypes = async () =>
 
 export const listSuperHostProperties = async () => {
   const topOwners = await listTopOwners()
-  const topOwnerIds = topOwners.map((owner) => owner.ownerId)
+  const topOwnerIds = topOwners.map((owner: TopOwner) => owner.ownerId)
 
   if (topOwnerIds.length === 0) {
     return []
@@ -427,11 +427,11 @@ export const removeOrDeactivateRoomForOwner = async (
   }
 
   const activeBookings = await getRoomActiveBookings(room.id)
-  const confirmedBookings = activeBookings.filter((booking) => booking.bookingStatus === 'CONFIRMED')
-  const pendingBookings = activeBookings.filter((booking) => booking.bookingStatus === 'PENDING')
+  const confirmedBookings = activeBookings.filter((booking: Booking) => booking.bookingStatus === 'CONFIRMED')
+  const pendingBookings = activeBookings.filter((booking: Booking) => booking.bookingStatus === 'PENDING')
 
   if (action === 'cancel_pending') {
-    await refundBookingPayments(pendingBookings.map((booking) => booking.id))
+    await refundBookingPayments(pendingBookings.map((booking: Booking) => booking.id))
 
     if (confirmedBookings.length > 0) {
       return prisma.room.update({
@@ -508,12 +508,12 @@ export const removeOrDeactivatePropertyForOwner = async (
     throw new HttpError(403, 'You do not have access to this property')
   }
 
-  const activeBookings = property.rooms.flatMap((room) => room.bookings)
-  const confirmedBookings = activeBookings.filter((booking) => booking.bookingStatus === 'CONFIRMED')
-  const pendingBookings = activeBookings.filter((booking) => booking.bookingStatus === 'PENDING')
+  const activeBookings: Booking[] = property.rooms.flatMap((room: { bookings: Booking[] }) => room.bookings)
+  const confirmedBookings = activeBookings.filter((booking: Booking) => booking.bookingStatus === 'CONFIRMED')
+  const pendingBookings = activeBookings.filter((booking: Booking) => booking.bookingStatus === 'PENDING')
 
   if (action === 'cancel_pending') {
-    await refundBookingPayments(pendingBookings.map((booking) => booking.id))
+    await refundBookingPayments(pendingBookings.map((booking: Booking) => booking.id))
 
     if (confirmedBookings.length > 0) {
       await prisma.room.updateMany({

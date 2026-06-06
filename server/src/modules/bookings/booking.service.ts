@@ -91,7 +91,7 @@ export const syncBookingPaymentAutomation = async () => {
 
   for (const booking of partialBookings) {
     if (booking.startDatetime <= oneDayAhead) {
-      await prisma.$transaction((tx) => refundBooking(booking.id, tx))
+      await prisma.$transaction((tx: Prisma.TransactionClient) => refundBooking(booking.id, tx))
       continue
     }
 
@@ -287,7 +287,7 @@ export const updateBookingStatus = async (
   }
 
   if (status === 'CANCELLED') {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await refundBooking(booking.id, tx)
 
       return tx.booking.findUniqueOrThrow({

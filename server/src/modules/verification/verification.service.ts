@@ -1,4 +1,4 @@
-import { VerificationStatus } from '@prisma/client'
+import { VerificationStatus, type Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { HttpError } from '../../utils/http'
 
@@ -93,7 +93,7 @@ export const reviewVerificationRequest = async (
 
   const status = VerificationStatus[input.status]
 
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const updatedRequest = await tx.verificationRequest.update({
       where: { id: requestId },
       data: {
