@@ -83,34 +83,26 @@ function PaymentPage() {
   }
 
   return (
-    <div className="space-y-6 pb-14">
-      <BookingHeader step={2} subtitle="Kindly follow the instructions below" title="Payment" />
+    <div className="space-y-3 pb-3">
+      <BookingHeader compact step={2} subtitle="Kindly follow the instructions below" title="Payment" />
 
-      <div className="section-container grid gap-5 rounded-3xl bg-white p-5 shadow-sm shadow-slate-200 lg:grid-cols-[1fr_0.9fr] lg:p-6">
-        <article className="space-y-4 border-slate-200 lg:border-r lg:pr-7">
-          <p className="text-xl leading-relaxed text-slate-800 md:text-2xl">
-            Transfer LankaStay:
-            <br />
-            <br />
-            {days} Days at {draft.hotelName},
-            <br />
-            {draft.location}
-            <br />
-            Room: {draft.roomName}
-            <br />
-            <br />
-            Total: <span className="font-semibold text-slate-900">${total} USD</span>
-            <br />
-            <br />
-            Initial Payment: <span className="font-semibold text-slate-900">${initialPayment}</span>
-          </p>
+      <div className="section-container grid gap-4 rounded-lg bg-white p-4 shadow-sm shadow-slate-200 lg:grid-cols-[0.8fr_1fr]">
+        <article className="border-slate-200 lg:border-r lg:pr-5">
+          <h2 className="text-xl font-semibold text-slate-900">Booking summary</h2>
+          <div className="mt-3 grid gap-2 text-sm text-slate-600">
+            <p><span className="font-medium text-slate-900">{draft.hotelName}</span> · {draft.location}</p>
+            <p>{days} Days · Room: {draft.roomName}</p>
+            <p>Total: <span className="font-semibold text-slate-900">${total} USD</span></p>
+            <p>Initial Payment: <span className="font-semibold text-slate-900">${initialPayment}</span></p>
+          </div>
         </article>
 
-        <form className="space-y-3 lg:pl-2" onSubmit={payNow}>
-          <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+        <form className="space-y-2 lg:pl-1" onSubmit={payNow}>
+          <div className="grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm font-medium text-slate-800">
             Payment Type
             <select
-              className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+              className="h-9 rounded-lg bg-slate-100 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30"
               onChange={(event) => setPaymentType(event.target.value as 'partial' | 'full')}
               value={paymentType}
             >
@@ -120,14 +112,11 @@ function PaymentPage() {
               <option value="full">Full payment</option>
             </select>
           </label>
-          {!isPartialPaymentAvailable ? (
-            <p className="text-sm text-amber-700">Bookings starting within 24 hours must be paid in full.</p>
-          ) : null}
 
-          <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+          <label className="grid gap-1 text-sm font-medium text-slate-800">
             Payment Method
             <select
-              className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+              className="h-9 rounded-lg bg-slate-100 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30"
               onChange={(event) => setPaymentMethod(event.target.value as 'CARD' | 'BANK_TRANSFER' | 'CASH')}
               value={paymentMethod}
             >
@@ -136,46 +125,50 @@ function PaymentPage() {
               <option value="CASH">Cash</option>
             </select>
           </label>
+          </div>
+          {!isPartialPaymentAvailable ? (
+            <p className="text-xs text-amber-700">Bookings starting within 24 hours must be paid in full.</p>
+          ) : null}
 
           {paymentMethod === 'CARD' ? (
-            <>
-          <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+            <div className="grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm font-medium text-slate-800 sm:col-span-2">
             Card Number
             <input
-              className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+              className="h-9 rounded-lg bg-slate-100 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30"
               onChange={(event) => setCardNumber(event.target.value)}
               placeholder="Payment card number"
               value={cardNumber}
             />
           </label>
 
-          <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+          <label className="grid gap-1 text-sm font-medium text-slate-800">
             Exp Date
             <input
-              className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+              className="h-9 rounded-lg bg-slate-100 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30"
               onChange={(event) => setExpDate(event.target.value)}
               placeholder="MM/YY"
               value={expDate}
             />
           </label>
 
-          <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+          <label className="grid gap-1 text-sm font-medium text-slate-800">
             CVV
             <input
-              className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+              className="h-9 rounded-lg bg-slate-100 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30"
               onChange={(event) => setCvv(event.target.value)}
               placeholder="Beside the card"
               value={cvv}
             />
           </label>
-            </>
+            </div>
           ) : null}
 
           {paymentMethod === 'BANK_TRANSFER' ? (
-            <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
+            <label className="grid gap-1 text-sm font-medium text-slate-800">
               Bank
               <input
-                className="h-11 rounded-xl bg-slate-100 px-4 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30 md:text-base"
+                className="h-9 rounded-lg bg-slate-100 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-primary/30"
                 onChange={(event) => setBank(event.target.value)}
                 placeholder="Bank name"
                 value={bank}
@@ -184,12 +177,12 @@ function PaymentPage() {
           ) : null}
 
           {paymentMethod === 'CASH' ? (
-            <div className="rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-600">
+            <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
               Cash payment will be marked in the system and still wait for owner approval.
             </div>
           ) : null}
 
-          <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
             You are about to pay <span className="font-semibold text-slate-900">${amountToPay}</span> via{' '}
             <span className="font-semibold text-slate-900">{paymentMethod.replace('_', ' ').toLowerCase()}</span>.
           </div>
@@ -197,19 +190,21 @@ function PaymentPage() {
             <p className="text-sm text-red-600">{bookingMutation.error.message}</p>
           ) : null}
 
+          <div className="grid grid-cols-2 gap-2 pt-1">
           <button
-            className="mt-5 h-11 w-full rounded-2xl bg-primary text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 md:text-lg"
+            className="h-9 w-full rounded-lg bg-primary text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             disabled={bookingMutation.isPending}
             type="submit"
           >
             {bookingMutation.isPending ? 'Processing...' : 'Pay Now'}
           </button>
           <Link
-            className="grid h-11 w-full place-items-center rounded-2xl bg-slate-100 text-base text-slate-400 md:text-lg"
+            className="grid h-9 w-full place-items-center rounded-lg bg-slate-100 text-sm text-slate-500"
             to={`/booking/${draft.hotelSlug}`}
           >
             Cancel
           </Link>
+          </div>
         </form>
       </div>
     </div>

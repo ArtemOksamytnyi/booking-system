@@ -74,7 +74,7 @@ function BookingInformationContent({ hotel }: BookingInformationContentProps) {
   }
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-8">
       <BookingHeader
         step={1}
         subtitle="Please fill up the blank fields below"
@@ -95,7 +95,7 @@ function BookingInformationContent({ hotel }: BookingInformationContentProps) {
 
         <article className="space-y-4 lg:pl-2">
           <div>
-            <p className="text-xl font-medium text-slate-700">How long you will stay?</p>
+            <p className="text-sm font-medium text-slate-700">How long you will stay?</p>
             <div className="mt-2 flex h-12 items-center rounded-xl bg-slate-100">
               <button
                 className="h-full w-14 rounded-l-xl bg-rose-500 text-2xl font-semibold text-white"
@@ -124,7 +124,7 @@ function BookingInformationContent({ hotel }: BookingInformationContentProps) {
           </div>
 
           <div>
-            <p className="text-xl font-medium text-slate-700">Pick a Date</p>
+            <p className="text-sm font-medium text-slate-700">Pick a Date</p>
             <input
               className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-4 text-base text-slate-700 outline-none focus:border-primary"
               onChange={(event) => {
@@ -135,7 +135,7 @@ function BookingInformationContent({ hotel }: BookingInformationContentProps) {
               type="date"
               value={checkIn}
             />
-            <p className="mt-2 text-lg text-slate-500">
+            <p className="mt-2 text-sm text-slate-500">
               {new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short' }).format(
                 new Date(`${checkIn}T00:00:00`),
               )}{' '}
@@ -163,7 +163,7 @@ function BookingInformationContent({ hotel }: BookingInformationContentProps) {
             </select>
           </div>
 
-          <p className="text-3xl leading-tight text-slate-400">
+          <p className="text-xl leading-tight text-slate-400">
             You will pay <span className="font-semibold text-slate-900">${total} USD</span>
             <br />
             per <span className="font-semibold text-slate-900">{days} Days</span>
