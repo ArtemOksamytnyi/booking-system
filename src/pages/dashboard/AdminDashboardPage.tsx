@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getAllBookings, getMyBookings, updateBookingStatusRequest } from '../../api/bookings'
+import { getAllBookings, getMyBookings, updateBookingStatusRequest, type DashboardBooking } from '../../api/bookings'
 import { createPaymentRequest } from '../../api/payments'
 import { getMyReminders } from '../../api/reminders'
 import { getUsers } from '../../api/users'
@@ -8,6 +8,7 @@ import {
   getVerificationRequests,
   reviewVerificationRequestInApi,
 } from '../../api/verification'
+import RemainingPaymentModal, { type RemainingPaymentMethod } from '../../components/RemainingPaymentModal'
 import { useAuth, humanizeRole } from '../../context/AuthContext'
 import { formatDateRange } from '../../context/BookingContext'
 import { useUiStore } from '../../store/uiStore'
@@ -34,6 +35,7 @@ function AdminDashboardPage() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
   const [adminComment, setAdminComment] = useState('')
   const [verificationPage, setVerificationPage] = useState(1)
+  const [paymentBooking, setPaymentBooking] = useState<DashboardBooking | null>(null)
 
   const { data: users = [] } = useQuery({
     enabled: Boolean(user?.role === 'admin'),
@@ -132,14 +134,16 @@ function AdminDashboardPage() {
   })
 
   const topUpMutation = useMutation({
-    mutationFn: (booking: (typeof myBookings)[number]) =>
+    mutationFn: ({ booking, paymentMethod }: { booking: DashboardBooking; paymentMethod: RemainingPaymentMethod }) =>
       createPaymentRequest({
         bookingId: Number(booking.id),
         amount: booking.remainingAmount,
-        paymentMethod: 'CARD',
+        paymentMethod,
       }),
     onSuccess: () => {
+      setPaymentBooking(null)
       queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-reminders', 'me'] })
     },
   })
 
@@ -182,7 +186,7 @@ function AdminDashboardPage() {
               {!showRenter && booking.paymentStatus === 'partially_paid' && booking.remainingAmount > 0 && !booking.isInactive ? (
                 <button
                   className="rounded-full border border-primary px-2 py-1 text-[11px] font-semibold text-primary"
-                  onClick={() => topUpMutation.mutate(booking)}
+                  onClick={() => setPaymentBooking(booking)}
                   type="button"
                 >
                   Pay remaining ${booking.remainingAmount}
@@ -518,6 +522,16 @@ function AdminDashboardPage() {
           </div>
         </main>
       </div>
+      {paymentBooking ? (
+        <RemainingPaymentModal
+          amount={paymentBooking.remainingAmount}
+          error={topUpMutation.error?.message}
+          hotelName={paymentBooking.hotelName}
+          isPending={topUpMutation.isPending}
+          onClose={() => setPaymentBooking(null)}
+          onSubmit={(paymentMethod) => topUpMutation.mutate({ booking: paymentBooking, paymentMethod })}
+        />
+      ) : null}
     </div>
   )
 }

@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getMyBookings, updateBookingStatusRequest } from '../../api/bookings'
+import { getMyBookings, updateBookingStatusRequest, type DashboardBooking } from '../../api/bookings'
 import { createPaymentRequest } from '../../api/payments'
 import { getMyReminders } from '../../api/reminders'
+import RemainingPaymentModal, { type RemainingPaymentMethod } from '../../components/RemainingPaymentModal'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateRange } from '../../context/BookingContext'
 import { useUiStore } from '../../store/uiStore'
@@ -19,6 +21,7 @@ function UserDashboardPage() {
   const activeTab = useUiStore((state) => state.userDashboardTab)
   const setActiveTab = useUiStore((state) => state.setUserDashboardTab)
   const selectedTab = tabItems.some((item) => item.id === activeTab) ? activeTab : 'bookings'
+  const [paymentBooking, setPaymentBooking] = useState<DashboardBooking | null>(null)
 
   const { data: bookings = [] } = useQuery({
     enabled: Boolean(user),
@@ -43,14 +46,16 @@ function UserDashboardPage() {
   })
 
   const topUpMutation = useMutation({
-    mutationFn: (booking: (typeof bookings)[number]) =>
+    mutationFn: ({ booking, paymentMethod }: { booking: DashboardBooking; paymentMethod: RemainingPaymentMethod }) =>
       createPaymentRequest({
         bookingId: Number(booking.id),
         amount: booking.remainingAmount,
-        paymentMethod: 'CARD',
+        paymentMethod,
       }),
     onSuccess: () => {
+      setPaymentBooking(null)
       queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-reminders', 'me'] })
     },
   })
 
@@ -108,7 +113,7 @@ function UserDashboardPage() {
                   {booking.paymentStatus === 'partially_paid' && booking.remainingAmount > 0 && !booking.isInactive ? (
                     <button
                       className="rounded-full border border-primary px-2 py-1 text-[11px] font-semibold text-primary"
-                      onClick={() => topUpMutation.mutate(booking)}
+                      onClick={() => setPaymentBooking(booking)}
                       type="button"
                     >
                       Pay remaining ${booking.remainingAmount}
@@ -208,6 +213,16 @@ function UserDashboardPage() {
           </div>
         </main>
       </div>
+      {paymentBooking ? (
+        <RemainingPaymentModal
+          amount={paymentBooking.remainingAmount}
+          error={topUpMutation.error?.message}
+          hotelName={paymentBooking.hotelName}
+          isPending={topUpMutation.isPending}
+          onClose={() => setPaymentBooking(null)}
+          onSubmit={(paymentMethod) => topUpMutation.mutate({ booking: paymentBooking, paymentMethod })}
+        />
+      ) : null}
     </div>
   )
 }

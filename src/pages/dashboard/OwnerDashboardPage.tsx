@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getMyBookings, getOwnerBookings, updateBookingStatusRequest } from '../../api/bookings'
+import { getMyBookings, getOwnerBookings, updateBookingStatusRequest, type DashboardBooking } from '../../api/bookings'
 import { createPaymentRequest } from '../../api/payments'
 import {
   createOwnerProperty,
@@ -15,6 +15,7 @@ import {
 import { getMyReminders } from '../../api/reminders'
 import { getVerificationRequests } from '../../api/verification'
 import { getMyOwnerAnalytics } from '../../api/users'
+import RemainingPaymentModal, { type RemainingPaymentMethod } from '../../components/RemainingPaymentModal'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateRange } from '../../context/BookingContext'
 import { useUiStore } from '../../store/uiStore'
@@ -49,6 +50,7 @@ function OwnerDashboardPage() {
   const [roomIsActive, setRoomIsActive] = useState(true)
   const [editingRoomId, setEditingRoomId] = useState<number | null>(null)
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null)
+  const [paymentBooking, setPaymentBooking] = useState<DashboardBooking | null>(null)
   const [ownerDecisionComment, setOwnerDecisionComment] = useState('')
   const [expandedHotels, setExpandedHotels] = useState<Record<number, boolean>>({})
   const [hotelPage, setHotelPage] = useState(1)
@@ -186,14 +188,16 @@ function OwnerDashboardPage() {
   })
 
   const topUpMutation = useMutation({
-    mutationFn: (booking: (typeof personalBookings)[number]) =>
+    mutationFn: ({ booking, paymentMethod }: { booking: DashboardBooking; paymentMethod: RemainingPaymentMethod }) =>
       createPaymentRequest({
         bookingId: Number(booking.id),
         amount: booking.remainingAmount,
-        paymentMethod: 'CARD',
+        paymentMethod,
       }),
     onSuccess: () => {
+      setPaymentBooking(null)
       queryClient.invalidateQueries({ queryKey: ['dashboard-bookings', 'me'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-reminders', 'me'] })
     },
   })
 
@@ -341,7 +345,7 @@ function OwnerDashboardPage() {
               {!showRenter && booking.paymentStatus === 'partially_paid' && booking.remainingAmount > 0 && !booking.isInactive ? (
                 <button
                   className="rounded-full border border-primary px-2 py-1 text-[11px] font-semibold text-primary"
-                  onClick={() => topUpMutation.mutate(booking)}
+                  onClick={() => setPaymentBooking(booking)}
                   type="button"
                 >
                   Pay remaining ${booking.remainingAmount}
@@ -861,6 +865,17 @@ function OwnerDashboardPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {paymentBooking ? (
+        <RemainingPaymentModal
+          amount={paymentBooking.remainingAmount}
+          error={topUpMutation.error?.message}
+          hotelName={paymentBooking.hotelName}
+          isPending={topUpMutation.isPending}
+          onClose={() => setPaymentBooking(null)}
+          onSubmit={(paymentMethod) => topUpMutation.mutate({ booking: paymentBooking, paymentMethod })}
+        />
       ) : null}
 
       {selectedBooking ? (
