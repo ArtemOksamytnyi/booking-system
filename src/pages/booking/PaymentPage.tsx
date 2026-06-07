@@ -14,16 +14,22 @@ const daysBetween = (checkIn: string, checkOut: string) => {
   return Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)))
 }
 
+const canPayPartially = (checkIn: string) =>
+  new Date(`${checkIn}T00:00:00.000Z`).getTime() > Date.now() + 24 * 60 * 60 * 1000
+
 function PaymentPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { draft, clearDraft } = useBooking()
+  const isPartialPaymentAvailable = draft ? canPayPartially(draft.checkIn) : false
 
   const [cardNumber, setCardNumber] = useState('')
   const [bank, setBank] = useState('')
   const [expDate, setExpDate] = useState('')
   const [cvv, setCvv] = useState('')
-  const [paymentType, setPaymentType] = useState<'partial' | 'full'>('partial')
+  const [paymentType, setPaymentType] = useState<'partial' | 'full'>(() =>
+    isPartialPaymentAvailable ? 'partial' : 'full',
+  )
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'BANK_TRANSFER' | 'CASH'>('CARD')
 
   const bookingMutation = useMutation({
@@ -109,10 +115,15 @@ function PaymentPage() {
               onChange={(event) => setPaymentType(event.target.value as 'partial' | 'full')}
               value={paymentType}
             >
-              <option value="partial">Partial payment</option>
+              <option disabled={!isPartialPaymentAvailable} value="partial">
+                Partial payment
+              </option>
               <option value="full">Full payment</option>
             </select>
           </label>
+          {!isPartialPaymentAvailable ? (
+            <p className="text-sm text-amber-700">Bookings starting within 24 hours must be paid in full.</p>
+          ) : null}
 
           <label className="grid gap-1 text-sm font-medium text-slate-800 md:text-base">
             Payment Method
@@ -183,9 +194,13 @@ function PaymentPage() {
             You are about to pay <span className="font-semibold text-slate-900">${amountToPay}</span> via{' '}
             <span className="font-semibold text-slate-900">{paymentMethod.replace('_', ' ').toLowerCase()}</span>.
           </div>
+          {bookingMutation.error ? (
+            <p className="text-sm text-red-600">{bookingMutation.error.message}</p>
+          ) : null}
 
           <button
-            className="mt-5 h-11 w-full rounded-2xl bg-primary text-base font-semibold text-white md:text-lg"
+            className="mt-5 h-11 w-full rounded-2xl bg-primary text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 md:text-lg"
+            disabled={bookingMutation.isPending}
             type="submit"
           >
             {bookingMutation.isPending ? 'Processing...' : 'Pay Now'}

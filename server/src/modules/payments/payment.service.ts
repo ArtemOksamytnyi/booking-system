@@ -66,6 +66,13 @@ export const createPayment = async (actor: AuthenticatedUser, input: {
     const totalPaid = Number(paidAmount._sum.amount ?? 0)
     const paymentStatus = totalPaid >= totalPrice ? PaymentStatus.PAID : PaymentStatus.PARTIALLY_PAID
 
+    if (
+      paymentStatus === PaymentStatus.PARTIALLY_PAID &&
+      booking.startDatetime.getTime() <= Date.now() + 24 * 60 * 60 * 1000
+    ) {
+      throw new HttpError(400, 'Bookings starting within 24 hours must be paid in full')
+    }
+
     await tx.booking.update({
       where: { id: booking.id },
       data: {
