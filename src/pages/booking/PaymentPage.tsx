@@ -20,7 +20,7 @@ const canPayPartially = (checkIn: string) =>
 function PaymentPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { draft, clearDraft } = useBooking()
+  const { draft } = useBooking()
   const isPartialPaymentAvailable = draft ? canPayPartially(draft.checkIn) : false
 
   const [cardNumber, setCardNumber] = useState('')
@@ -55,7 +55,6 @@ function PaymentPage() {
       })
     },
     onSuccess: () => {
-      clearDraft()
       navigate('/payment/success')
     },
   })

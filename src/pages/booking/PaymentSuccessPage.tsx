@@ -1,11 +1,18 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import BookingHeader from '../../components/BookingHeader'
 import { useAuth } from '../../context/AuthContext'
 import { getDashboardPath } from '../../context/AuthContext'
+import { useBooking } from '../../context/BookingContext'
 
 function PaymentSuccessPage() {
   const { user } = useAuth()
+  const { clearDraft } = useBooking()
   const dashboardPath = user ? getDashboardPath(user.role) : '/'
+
+  useEffect(() => {
+    clearDraft()
+  }, [clearDraft])
 
   return (
     <div className="space-y-8 pb-16">
