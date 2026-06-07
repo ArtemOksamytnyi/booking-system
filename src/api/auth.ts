@@ -55,22 +55,20 @@ export const loginRequest = async (email: string, password: string) => {
 }
 
 export const registerRequest = async (input: {
-  name: string
+  firstName: string
+  lastName: string
   email: string
   password: string
   role: AuthRole
   phone: string
   age?: number
 }) => {
-  const [firstName, ...rest] = input.name.trim().split(/\s+/)
-  const lastName = rest.join(' ') || firstName
-
   const payload = await apiFetch<ApiAuthPayload>('/auth/register', {
     method: 'POST',
     body: JSON.stringify({
       role: input.role,
-      firstName,
-      lastName,
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
       phone: input.phone,
       email: input.email,
       age: input.age,

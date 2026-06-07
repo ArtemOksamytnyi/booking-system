@@ -7,7 +7,7 @@ const optionalTrimmedString = z.preprocess(
 )
 const optionalUrlString = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-  z.string().trim().url().optional(),
+  z.string().trim().url().max(255).optional(),
 )
 
 export const createPropertySchema = z.object({

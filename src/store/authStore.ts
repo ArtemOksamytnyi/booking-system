@@ -39,7 +39,8 @@ export type AuthResult = {
 }
 
 export type RegisterPayload = {
-  name: string
+  firstName: string
+  lastName: string
   email: string
   password: string
   role: AuthRole
@@ -50,9 +51,7 @@ export type RegisterPayload = {
   propertyAddress?: string
   propertyDescription?: string
   propertyPhotoUrl?: string
-  ownerComment?: string
-  identityDocumentLink?: string
-  propertyDocumentLink?: string
+  verificationComment?: string
 }
 
 type AuthState = {
@@ -105,7 +104,8 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       register: async ({
-        name,
+        firstName,
+        lastName,
         email,
         password,
         role,
@@ -116,13 +116,12 @@ export const useAuthStore = create<AuthState>()(
         propertyAddress,
         propertyDescription,
         propertyPhotoUrl,
-        ownerComment,
-        identityDocumentLink,
-        propertyDocumentLink,
+        verificationComment,
       }) => {
         try {
           const payload = await registerRequest({
-            name,
+            firstName,
+            lastName,
             email: email.toLowerCase().trim(),
             password,
             role,
@@ -145,13 +144,7 @@ export const useAuthStore = create<AuthState>()(
               description: propertyDescription?.trim() || undefined,
               photoUrl: propertyPhotoUrl?.trim() || undefined,
               propertyTypeName: propertyTypeName ?? 'hotel',
-              verificationComment: [
-                ownerComment?.trim(),
-                identityDocumentLink?.trim() ? `Identity document: ${identityDocumentLink.trim()}` : null,
-                propertyDocumentLink?.trim() ? `Property document: ${propertyDocumentLink.trim()}` : null,
-              ]
-                .filter(Boolean)
-                .join('\n') || undefined,
+              verificationComment: verificationComment?.trim() || undefined,
             })
 
             return {

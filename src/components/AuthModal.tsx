@@ -16,20 +16,19 @@ type AuthModalProps = {
 function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
   const { login, register } = useAuth()
 
-  const [name, setName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [age, setAge] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<AuthRole>('user')
-  const [identityDocumentLink, setIdentityDocumentLink] = useState('')
-  const [propertyDocumentLink, setPropertyDocumentLink] = useState('')
   const [propertyName, setPropertyName] = useState('')
   const [propertyTypeName, setPropertyTypeName] = useState('hotel')
   const [propertyAddress, setPropertyAddress] = useState('')
   const [propertyDescription, setPropertyDescription] = useState('')
   const [propertyPhotoUrl, setPropertyPhotoUrl] = useState('')
-  const [ownerComment, setOwnerComment] = useState('')
+  const [verificationComment, setVerificationComment] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const isRegister = mode === 'register'
@@ -55,14 +54,10 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
     event.preventDefault()
     setError(null)
 
-    if (isOwnerRegistration && (!identityDocumentLink.trim() || !propertyDocumentLink.trim())) {
-      setError('Hotel owner registration requires both identity and property document links.')
-      return
-    }
-
     const result = isRegister
-        ? register({
-          name,
+      ? register({
+          firstName,
+          lastName,
           email,
           phone,
           age: age ? Number(age) : undefined,
@@ -73,9 +68,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
           propertyAddress,
           propertyDescription,
           propertyPhotoUrl,
-          ownerComment,
-          identityDocumentLink,
-          propertyDocumentLink,
+          verificationComment,
         })
       : login(email.trim().toLowerCase(), password)
 
@@ -122,16 +115,32 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
 
         <form className="space-y-4 overflow-y-auto px-6 py-5" onSubmit={handleSubmit}>
           {isRegister ? (
-            <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-700">Full Name</span>
-              <input
-                className="h-12 rounded-xl border border-slate-200 px-4 outline-none transition focus:border-primary"
-                onChange={(event) => setName(event.target.value)}
-                placeholder="John Doe"
-                required
-                value={name}
-              />
-            </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2">
+                <span className="text-sm font-medium text-slate-700">First Name</span>
+                <input
+                  className="h-12 rounded-xl border border-slate-200 px-4 outline-none transition focus:border-primary"
+                  maxLength={50}
+                  minLength={2}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  placeholder="John"
+                  required
+                  value={firstName}
+                />
+              </label>
+              <label className="grid gap-2">
+                <span className="text-sm font-medium text-slate-700">Last Name</span>
+                <input
+                  className="h-12 rounded-xl border border-slate-200 px-4 outline-none transition focus:border-primary"
+                  maxLength={50}
+                  minLength={2}
+                  onChange={(event) => setLastName(event.target.value)}
+                  placeholder="Doe"
+                  required
+                  value={lastName}
+                />
+              </label>
+            </div>
           ) : null}
 
           {isRegister ? (
@@ -140,6 +149,8 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
                 <span className="text-sm font-medium text-slate-700">Phone</span>
                 <input
                   className="h-12 rounded-xl border border-slate-200 px-4 outline-none transition focus:border-primary"
+                  maxLength={20}
+                  minLength={7}
                   onChange={(event) => setPhone(event.target.value)}
                   placeholder="+380..."
                   required
@@ -151,10 +162,10 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
                 <span className="text-sm font-medium text-slate-700">Age</span>
                 <input
                   className="h-12 rounded-xl border border-slate-200 px-4 outline-none transition focus:border-primary"
-                  min={18}
+                  max={120}
+                  min={1}
                   onChange={(event) => setAge(event.target.value)}
                   placeholder="29"
-                  required
                   type="number"
                   value={age}
                 />
@@ -166,6 +177,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
             <span className="text-sm font-medium text-slate-700">Email</span>
             <input
               className="h-12 rounded-xl border border-slate-200 px-4 outline-none transition focus:border-primary"
+              maxLength={100}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="john@example.com"
               required
@@ -204,12 +216,14 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
 
           {isOwnerRegistration ? (
             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-700">Hotel and verification details</p>
+              <p className="text-sm font-semibold text-slate-700">Property and verification request</p>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="grid gap-2">
                   <span className="text-xs text-slate-500">Property name</span>
                   <input
                     className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                    maxLength={120}
+                    minLength={2}
                     onChange={(event) => setPropertyName(event.target.value)}
                     placeholder="Azure Retreat"
                     required
@@ -237,6 +251,8 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
                 <span className="text-xs text-slate-500">Address</span>
                 <input
                   className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                  maxLength={255}
+                  minLength={2}
                   onChange={(event) => setPropertyAddress(event.target.value)}
                   placeholder="Galle, Sri Lanka"
                   required
@@ -247,6 +263,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
                 <span className="text-xs text-slate-500">Description</span>
                 <textarea
                   className="min-h-24 rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
+                  maxLength={5000}
                   onChange={(event) => setPropertyDescription(event.target.value)}
                   placeholder="Describe the property"
                   value={propertyDescription}
@@ -256,6 +273,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
                 <span className="text-xs text-slate-500">Photo URL</span>
                 <input
                   className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
+                  maxLength={255}
                   onChange={(event) => setPropertyPhotoUrl(event.target.value)}
                   placeholder="https://..."
                   type="url"
@@ -263,34 +281,13 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
                 />
               </label>
               <label className="grid gap-2">
-                <span className="text-xs text-slate-500">Identity document link</span>
-                <input
-                  className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
-                  onChange={(event) => setIdentityDocumentLink(event.target.value)}
-                  placeholder="https://..."
-                  required
-                  type="url"
-                  value={identityDocumentLink}
-                />
-              </label>
-              <label className="grid gap-2">
-                <span className="text-xs text-slate-500">Property ownership document link</span>
-                <input
-                  className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary"
-                  onChange={(event) => setPropertyDocumentLink(event.target.value)}
-                  placeholder="https://..."
-                  required
-                  type="url"
-                  value={propertyDocumentLink}
-                />
-              </label>
-              <label className="grid gap-2">
                 <span className="text-xs text-slate-500">Verification comment</span>
                 <textarea
                   className="min-h-20 rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
-                  onChange={(event) => setOwnerComment(event.target.value)}
-                  placeholder="Anything admin should know about your documents or property?"
-                  value={ownerComment}
+                  maxLength={5000}
+                  onChange={(event) => setVerificationComment(event.target.value)}
+                  placeholder="Anything the admin should know about this property?"
+                  value={verificationComment}
                 />
               </label>
               <p className="text-xs text-slate-500">Selected role: {humanizeRole(role)}</p>
@@ -301,8 +298,8 @@ function AuthModal({ mode, onClose, onSwitchMode, onSuccess }: AuthModalProps) {
 
           <button
             className="h-12 w-full rounded-xl bg-primary text-sm font-semibold text-white transition hover:bg-blue-700"
-          type="submit"
-        >
+            type="submit"
+          >
             {submitText}
           </button>
         </form>
